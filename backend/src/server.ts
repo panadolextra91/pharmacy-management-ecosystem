@@ -38,13 +38,17 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// API routes will be added here
+// API routes
+import authRoutes from './modules/access-control/routes';
+
 app.get('/api', (_req, res) => {
   res.json({
     message: 'Pharmacy Management API',
     version: '1.0.0',
   });
 });
+
+app.use('/api/auth', authRoutes);
 
 // Error handling (must be last)
 app.use(errorHandler);

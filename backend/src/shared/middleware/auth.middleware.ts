@@ -1,19 +1,11 @@
 import { Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import env from '../config/env';
 import { AuthenticatedRequest } from '../types/express';
 import { AppError } from './error-handler.middleware';
-
-export interface JWTPayload {
-  id: string;
-  pharmacyId?: string;
-  role: string;
-  email?: string;
-}
+import { verifyAccessToken, TokenPayload } from '../utils/jwt';
 
 export const authenticate = (
   req: AuthenticatedRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   try {
@@ -24,7 +16,7 @@ export const authenticate = (
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, env.JWT_SECRET) as JWTPayload;
+    const decoded = verifyAccessToken(token) as TokenPayload;
 
     req.user = {
       id: decoded.id,
@@ -35,8 +27,10 @@ export const authenticate = (
 
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
+    if (error instanceof Error && error.name === 'JsonWebTokenError') {
       next(new AppError('Invalid token', 401, 'AUTH_INVALID'));
+    } else if (error instanceof Error && error.name === 'TokenExpiredError') {
+      next(new AppError('Token expired', 401, 'TOKEN_EXPIRED'));
     } else {
       next(error);
     }

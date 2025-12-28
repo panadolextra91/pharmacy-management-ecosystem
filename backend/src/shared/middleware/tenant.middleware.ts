@@ -8,7 +8,7 @@ import { AppError } from './error-handler.middleware';
  */
 export const requirePharmacyAccess = (
   req: AuthenticatedRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   if (!req.user) {
@@ -35,7 +35,7 @@ export const requirePharmacyAccess = (
  */
 export const optionalPharmacyAccess = (
   req: AuthenticatedRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ) => {
   if (req.user?.pharmacyId) {
