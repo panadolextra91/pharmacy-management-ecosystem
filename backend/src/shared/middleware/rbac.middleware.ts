@@ -8,7 +8,7 @@ type AllowedRole = 'OWNER' | 'MANAGER' | 'PHARMACIST' | 'STAFF' | 'CUSTOMER';
  * Middleware to check if user has required role(s)
  */
 export const requireRole = (...allowedRoles: AllowedRole[]) => {
-  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(new AppError('Authentication required', 401, 'AUTH_REQUIRED'));
     }
