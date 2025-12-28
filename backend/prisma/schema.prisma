@@ -54,6 +54,7 @@ model Pharmacy {
   analytics     PharmacyAnalytics[]
   storageLocations StorageLocation[]
   deliveries    Delivery[]
+  staffNotifications StaffNotification[]
 
   @@index([latitude, longitude]) // For geospatial queries
   @@index([ownerId])
@@ -249,6 +250,9 @@ model PharmacyStaff {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  notifications StaffNotification[]
+  deliveries    Delivery[] // Staff can be assigned as delivery person
+
   @@index([pharmacyId])
   @@index([email])
   @@map("pharmacy_staff")
@@ -377,7 +381,6 @@ enum OrderStatus {
   PENDING
   CONFIRMED
   PREPARING
-  READY
   OUT_FOR_DELIVERY
   DELIVERED
   CANCELLED
@@ -414,19 +417,22 @@ model Delivery {
   pharmacyId            String          @map("pharmacy_id")
   pharmacy              Pharmacy        @relation(fields: [pharmacyId], references: [id])
   
-  deliveryService       String          @map("delivery_service") // "grab", "now", "be"
+  deliveryService       String          @map("delivery_service") // "internal", "grab", "now", "be"
   deliveryServiceOrderId String?        @map("delivery_service_order_id")
+  deliveryStaffId       String?         @map("delivery_staff_id") // Staff member assigned for delivery
+  deliveryStaff         PharmacyStaff? @relation(fields: [deliveryStaffId], references: [id])
   deliveryFee           Decimal         @db.Decimal(10, 2) @map("delivery_fee")
   estimatedDeliveryTime DateTime?       @map("estimated_delivery_time")
   actualDeliveryTime    DateTime?       @map("actual_delivery_time")
   status                DeliveryStatus  @default(PENDING)
-  deliveryPersonName     String?        @map("delivery_person_name")
-  deliveryPersonPhone    String?        @map("delivery_person_phone")
+  deliveryPersonName     String?        @map("delivery_person_name") // For external delivery services
+  deliveryPersonPhone    String?        @map("delivery_person_phone") // For external delivery services
   trackingUrl            String?        @map("tracking_url")
   
   createdAt              DateTime        @default(now()) @map("created_at")
   updatedAt              DateTime        @updatedAt @map("updated_at")
 
+  @@index([deliveryStaffId])
   @@map("deliveries")
 }
 
@@ -516,6 +522,40 @@ model PharmacyAnalytics {
   @@unique([pharmacyId, date])
   @@index([pharmacyId, date])
   @@map("pharmacy_analytics")
+}
+
+// Staff Notifications (In-web for pharmacy staff/owners)
+// When an event occurs, create one notification per active staff member in the pharmacy
+// This allows individual read tracking while broadcasting to all staff
+model StaffNotification {
+  id          String   @id @default(cuid())
+  staffId     String   @map("staff_id") // Always set - one notification per staff member
+  staff       PharmacyStaff @relation(fields: [staffId], references: [id])
+  pharmacyId  String   @map("pharmacy_id")
+  pharmacy    Pharmacy @relation(fields: [pharmacyId], references: [id])
+  type        StaffNotificationType
+  title       String
+  message     String
+  metadata    Json?    // Additional data (e.g., orderId, orderNumber, catalogId)
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([pharmacyId, isRead])
+  @@index([staffId, isRead])
+  @@index([pharmacyId, type, createdAt]) // For filtering by type
+  @@index([createdAt])
+  @@map("staff_notifications")
+}
+
+enum StaffNotificationType {
+  ORDER_NEW              // New order received
+  ORDER_DELETED          // Customer cancelled/deleted their order
+  CATALOG_IMPORTED       // New catalog imported by sales rep
+  INVENTORY_LOW_STOCK    // Inventory stock level below threshold
+  INVENTORY_EXPIRY_ALERT // Medicine batch expiring soon
+  PAYMENT_RECEIVED       // Payment received for an order
+  SYSTEM_ALERT           // System-wide alerts (maintenance, updates, etc.)
 }
 
 // ============================================
@@ -683,7 +723,7 @@ model ReminderLog {
   @@map("reminder_logs")
 }
 
-// Customer Notifications (In-app)
+// Customer Notifications (In-app + Push)
 model CustomerNotification {
   id          String   @id @default(cuid())
   customerId  String   @map("customer_id")
@@ -691,8 +731,10 @@ model CustomerNotification {
   type        CustomerNotificationType
   title       String
   message     String
-  metadata    Json?    // Additional data
+  metadata    Json?    // Additional data (e.g., orderId, orderNumber)
   isRead      Boolean  @default(false) @map("is_read")
+  pushSent    Boolean  @default(false) @map("push_sent") // Track if push notification was sent
+  pushSentAt  DateTime? @map("push_sent_at")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -702,12 +744,9 @@ model CustomerNotification {
 }
 
 enum CustomerNotificationType {
-  ORDER_NEW
-  ORDER_STATUS_CHANGED
-  DELIVERY_UPDATE
-  SCHEDULE_REMINDER
-  SYSTEM_ALERT
-  PROMOTION
+  ORDER_STATUS_CHANGED  // Order status updates (PENDING -> CONFIRMED, etc.)
+  DELIVERY_UPDATE       // Delivery status updates
+  MEDICINE_REMINDER     // Medicine reminder (also creates ReminderNotification for push)
 }
 
 // Customer Push Tokens (For mobile push notifications)
