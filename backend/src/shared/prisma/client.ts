@@ -8,79 +8,79 @@ export const createTenantPrisma = (pharmacyId: string) => {
   return prisma.$extends({
     query: {
       pharmacyInventory: {
-        async findMany({ args, query }) {
+        async findMany({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findUnique({ args, query }) {
+        async findUnique({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findFirst({ args, query }) {
+        async findFirst({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async count({ args, query }) {
+        async count({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
       },
       pharmacyOrder: {
-        async findMany({ args, query }) {
+        async findMany({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findUnique({ args, query }) {
+        async findUnique({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findFirst({ args, query }) {
+        async findFirst({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async count({ args, query }) {
+        async count({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
       },
       pharmacyInvoice: {
-        async findMany({ args, query }) {
+        async findMany({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findUnique({ args, query }) {
+        async findUnique({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findFirst({ args, query }) {
+        async findFirst({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async count({ args, query }) {
+        async count({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
       },
       pharmacyStaff: {
-        async findMany({ args, query }) {
+        async findMany({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findUnique({ args, query }) {
+        async findUnique({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findFirst({ args, query }) {
+        async findFirst({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
       },
       storageLocation: {
-        async findMany({ args, query }) {
+        async findMany({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
-        async findUnique({ args, query }) {
+        async findUnique({ args, query }: { args: any; query: any }) {
           args.where = { ...args.where, pharmacyId };
           return query(args);
         },
