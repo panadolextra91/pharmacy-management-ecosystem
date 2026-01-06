@@ -40,6 +40,9 @@ app.get('/health', (_req, res) => {
 
 // API routes
 import authRoutes from './modules/access-control/routes';
+import catalogRoutes from './modules/catalog/routes';
+import salesRoutes from './modules/sales/routes';
+import inventoryRoutes from './modules/inventory/routes';
 
 app.get('/api', (_req, res) => {
   res.json({
@@ -48,7 +51,13 @@ app.get('/api', (_req, res) => {
   });
 });
 
+import purchaseRoutes from './modules/purchases/routes';
+
 app.use('/api/auth', authRoutes);
+app.use('/api/catalog', catalogRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/purchases', purchaseRoutes);
+app.use('/api/sales', salesRoutes);
 
 // Error handling (must be last)
 app.use(errorHandler);
