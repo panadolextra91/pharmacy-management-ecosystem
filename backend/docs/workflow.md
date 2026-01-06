@@ -83,7 +83,7 @@ This document outlines the core workflows of the Pharmacy Management System, det
 1.  **Staff** processes payment (Cash/Transfer).
 2.  **System** updates Order `paymentStatus` to `PAID`.
 3.  **System** generates `PharmacyInvoice` linked to the Order.
-4.  **System** generates a printable Receipt (PDF/Text) containing:
+4.  **System** generates Receipt Data (JSON) for the Frontend, which renders and sends to printer:
     *   Pharmacy Info
     *   Items (Name, Quantity, Price)
     *   Total Amount

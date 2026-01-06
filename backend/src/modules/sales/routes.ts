@@ -6,6 +6,7 @@ const router = Router();
 
 // Protected routes (Staff/Owner)
 router.post('/orders', authenticate, salesController.createOrder.bind(salesController));
+router.get('/invoices/:id/receipt', authenticate, salesController.getReceipt.bind(salesController));
 // router.get('/orders', authenticate, salesController.findAll.bind(salesController)); 
 // router.get('/orders/:id', authenticate, salesController.findById.bind(salesController));
 

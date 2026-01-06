@@ -34,6 +34,7 @@
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
 | POST | `/orders` | Create new Order. Supports POS (Walk-in) via `isPosSale: true`. Triggers Stock Deduction & Invoice. | Yes |
+| GET | `/invoices/:id/receipt` | Get structured receipt data (JSON) for printing/PDF generation. | Yes |
 
 ## Inventory Management (`/api/inventory`)
 *Scoped to specific Pharmacy. Requires `pharmacyId` context.*

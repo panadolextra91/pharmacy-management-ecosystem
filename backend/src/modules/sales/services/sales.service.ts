@@ -152,6 +152,38 @@ class SalesService {
             return order;
         });
     }
+    async getReceipt(invoiceId: string, pharmacyId: string) {
+        const invoice = await prisma.pharmacyInvoice.findUnique({
+            where: { id: invoiceId, pharmacyId },
+            include: {
+                // payment: true, // Inverse relation issue, removing for now or need to query separately if needed
+                pharmacy: true,
+                items: {
+                    include: { inventory: { include: { units: true } } }
+                }
+            }
+        });
+
+        if (!invoice) throw new AppError('Invoice not found', 404, 'NOT_FOUND');
+
+        // Allow frontend to render specific receipt format
+        return {
+            storeName: invoice.pharmacy.name,
+            storeAddress: invoice.pharmacy.address,
+            storePhone: invoice.pharmacy.phone,
+            invoiceNumber: invoice.invoiceNumber,
+            date: invoice.invoiceDate,
+            items: invoice.items.map((i: any) => ({
+                name: i.inventory?.name || 'Unknown Item',
+                quantity: i.quantity,
+                price: i.price,
+                total: Number(i.price) * i.quantity
+            })),
+            totalAmount: invoice.totalAmount,
+            paymentMethod: invoice.type === 'OFFLINE' ? 'CASH/QR' : 'ONLINE',
+            qrString: `INV:${invoice.invoiceNumber}|AMT:${invoice.totalAmount}`
+        };
+    }
 }
 
 export default new SalesService();

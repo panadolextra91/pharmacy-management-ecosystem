@@ -22,6 +22,19 @@ class SalesController {
             next(error);
         }
     }
+    async getReceipt(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id } = req.params;
+            const pharmacyId = (req as any).pharmacyId || (req as any).user?.pharmacyId;
+            const receipt = await salesService.getReceipt(id, pharmacyId);
+            res.status(200).json({
+                success: true,
+                data: receipt
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
 }
 
 export default new SalesController();
