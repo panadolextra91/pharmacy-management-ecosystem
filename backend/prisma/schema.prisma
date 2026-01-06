@@ -10,6 +10,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+generator erd {
+  provider = "prisma-erd-generator"
+  output = "./ERD.svg"
+}
+
+generator dbml {
+  provider = "prisma-dbml-generator"
+  output = "./schema.dbml"
+}
+
 // ============================================
 // PLATFORM ZONE - Global/Shared Data
 // ============================================
@@ -51,6 +61,7 @@ model Pharmacy {
   inventory     PharmacyInventory[]
   orders        PharmacyOrder[]
   invoices     PharmacyInvoice[]
+  purchaseInvoices PurchaseInvoice[]
   analytics     PharmacyAnalytics[]
   storageLocations StorageLocation[]
   deliveries    Delivery[]
@@ -97,6 +108,7 @@ model GlobalMedicineCatalog {
   packaging       String?  // "Box of 10 blisters"
   activeIngredient String? @map("active_ingredient")
   barcode         String?
+  unitPrice       Decimal? @db.Decimal(10, 2) @map("unit_price")
   
   categoryId      String?  @map("category_id")
   category        Category? @relation(fields: [categoryId], references: [id])
@@ -146,6 +158,7 @@ model Supplier {
 
   salesReps   PharmaSalesRep[]
   catalogItems GlobalMedicineCatalog[]
+  purchaseInvoices PurchaseInvoice[]
 
   @@map("suppliers")
 }
@@ -286,12 +299,14 @@ model PharmacyInventory {
   storageLocation     StorageLocation? @relation(fields: [storageLocationId], references: [id])
   
   totalStockLevel     Int       @default(0) @map("total_stock_level")
+  minStockLevel       Int       @default(10) @map("min_stock_level") // Default threshold
   
   units               InventoryUnit[]
   batches             InventoryBatch[]
   orderItems          OrderItem[]
   cartItems           CartItem[]
   invoiceItems        InvoiceItem[]
+  purchaseItems       PurchaseItem[]
   
   isActive            Boolean   @default(true) @map("is_active")
   createdAt           DateTime  @default(now()) @map("created_at")
@@ -489,6 +504,60 @@ model PharmacyInvoice {
 enum InvoiceType {
   ONLINE
   OFFLINE
+}
+
+// Purchase Invoices (Inbound Stock)
+model PurchaseInvoice {
+  id            String          @id @default(cuid())
+  pharmacyId    String          @map("pharmacy_id")
+  pharmacy      Pharmacy        @relation(fields: [pharmacyId], references: [id])
+  supplierId    String?         @map("supplier_id")
+  supplier      Supplier?       @relation(fields: [supplierId], references: [id])
+  supplierName  String?         @map("supplier_name") // Fallback
+
+  invoiceNumber String          @map("invoice_number") // Vendor's invoice #
+  invoiceDate   DateTime        @default(now()) @map("invoice_date")
+  totalAmount   Decimal         @db.Decimal(10, 2) @map("total_amount")
+  
+  status        PurchaseStatus  @default(PENDING)
+  notes         String?
+  
+  items         PurchaseItem[]
+  
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  @@index([pharmacyId])
+  @@index([supplierId])
+  @@map("purchase_invoices")
+}
+
+enum PurchaseStatus {
+  PENDING
+  CONFIRMED   // Stock added to inventory
+  CANCELLED
+}
+
+// Purchase Items
+model PurchaseItem {
+  id                String          @id @default(cuid())
+  purchaseInvoiceId String          @map("purchase_invoice_id")
+  purchaseInvoice   PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+  
+  inventoryId       String          @map("inventory_id")
+  inventory         PharmacyInventory @relation(fields: [inventoryId], references: [id])
+
+  batchCode         String          @map("batch_code")
+  expiryDate        DateTime        @map("expiry_date")
+  
+  quantity          Int             // In BASE unit
+  unitPrice         Decimal         @db.Decimal(10, 2) @map("unit_price")
+  totalPrice        Decimal         @db.Decimal(10, 2) @map("total_price")
+  
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  @@map("purchase_items")
 }
 
 // Invoice Items

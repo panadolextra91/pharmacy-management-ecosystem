@@ -1,0 +1,720 @@
+//// ------------------------------------------------------
+//// THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+//// ------------------------------------------------------
+
+Table owners {
+  id String [pk]
+  email String [unique, not null]
+  password String [not null]
+  name String [not null]
+  phone String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  pharmacies pharmacies [not null]
+}
+
+Table pharmacies {
+  id String [pk]
+  ownerId String [not null]
+  owner owners [not null]
+  name String [not null]
+  address String [not null]
+  latitude Float [not null]
+  longitude Float [not null]
+  phone String [not null]
+  email String
+  hours Json [not null]
+  serviceRadius Float [not null, default: 10]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  staff pharmacy_staff [not null]
+  inventory pharmacy_inventory [not null]
+  orders pharmacy_orders [not null]
+  invoices pharmacy_invoices [not null]
+  purchaseInvoices purchase_invoices [not null]
+  analytics pharmacy_analytics [not null]
+  storageLocations storage_locations [not null]
+  deliveries deliveries [not null]
+  staffNotifications staff_notifications [not null]
+}
+
+Table customers {
+  id String [pk]
+  phone String [unique, not null]
+  email String
+  password String
+  fullName String
+  verified Boolean [not null, default: false]
+  verifiedAt DateTime
+  registrationSource String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  cart customer_carts
+  orders pharmacy_orders [not null]
+  invoices pharmacy_invoices [not null]
+  healthMetrics customer_health_metrics
+  healthRecords customer_health_records [not null]
+  allergies customer_allergies [not null]
+  reminders medicine_reminders [not null]
+  notifications customer_notifications [not null]
+  pushTokens customer_push_tokens [not null]
+  reminderLogs reminder_logs [not null]
+}
+
+Table global_medicine_catalog {
+  id String [pk]
+  name String [not null]
+  manufacturer String
+  description String
+  packaging String
+  activeIngredient String
+  barcode String
+  unitPrice Decimal
+  categoryId String
+  category categories
+  brandId String
+  brand brands
+  supplierId String [not null]
+  supplier suppliers [not null]
+  pharmaRepId String [not null]
+  pharmaRep pharma_sales_reps [not null]
+  inventoryItems pharmacy_inventory [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table pharma_sales_reps {
+  id String [pk]
+  name String [not null]
+  email String [unique, not null]
+  phone String [not null]
+  supplierId String [not null]
+  supplier suppliers [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  catalogItems global_medicine_catalog [not null]
+}
+
+Table suppliers {
+  id String [pk]
+  name String [not null]
+  contactInfo Json [not null]
+  address String [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  salesReps pharma_sales_reps [not null]
+  catalogItems global_medicine_catalog [not null]
+  purchaseInvoices purchase_invoices [not null]
+}
+
+Table categories {
+  id String [pk]
+  name String [unique, not null]
+  description String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  catalogItems global_medicine_catalog [not null]
+  inventoryItems pharmacy_inventory [not null]
+}
+
+Table brands {
+  id String [pk]
+  name String [unique, not null]
+  manufacturer String
+  country String
+  logo String
+  imagePublicId String
+  description String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  catalogItems global_medicine_catalog [not null]
+  inventoryItems pharmacy_inventory [not null]
+}
+
+Table news {
+  id String [pk]
+  title String [not null]
+  category String [not null]
+  content String [not null]
+  image String
+  imagePublicId String
+  readingTime Int [not null]
+  summary String
+  isFeatured Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table otps {
+  id String [pk]
+  phone String [not null]
+  otp String [not null]
+  expiresAt DateTime [not null]
+  isUsed Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table storage_locations {
+  id String [pk]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  name String [not null]
+  description String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  inventoryItems pharmacy_inventory [not null]
+
+  indexes {
+    (pharmacyId, name) [unique]
+  }
+}
+
+Table pharmacy_staff {
+  id String [pk]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  username String [not null]
+  password String [not null]
+  name String [not null]
+  email String [unique, not null]
+  role StaffRole [not null]
+  avatar String
+  avatarPublicId String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  notifications staff_notifications [not null]
+  deliveries deliveries [not null]
+}
+
+Table pharmacy_inventory {
+  id String [pk]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  globalCatalogId String
+  globalCatalog global_medicine_catalog
+  name String [not null]
+  description String
+  image String
+  imagePublicId String
+  categoryId String
+  category categories
+  brandId String
+  brand brands
+  storageLocationId String
+  storageLocation storage_locations
+  totalStockLevel Int [not null, default: 0]
+  minStockLevel Int [not null, default: 10]
+  units inventory_units [not null]
+  batches inventory_batches [not null]
+  orderItems order_items [not null]
+  cartItems cart_items [not null]
+  invoiceItems invoice_items [not null]
+  purchaseItems purchase_items [not null]
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table inventory_units {
+  id String [pk]
+  inventoryId String [not null]
+  inventory pharmacy_inventory [not null]
+  name String [not null]
+  conversionFactor Int [not null]
+  price Decimal [not null]
+  isBaseUnit Boolean [not null, default: false]
+  isDefaultSelling Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (inventoryId, name) [unique]
+  }
+}
+
+Table inventory_batches {
+  id String [pk]
+  inventoryId String [not null]
+  inventory pharmacy_inventory [not null]
+  batchCode String [not null]
+  expiryDate DateTime [not null]
+  stockQuantity Int [not null]
+  purchasePrice Decimal
+  purchaseDate DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table pharmacy_orders {
+  id String [pk]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  customerId String [not null]
+  customer customers [not null]
+  orderNumber String [unique, not null]
+  status OrderStatus [not null, default: 'PENDING']
+  subtotal Decimal [not null]
+  deliveryFee Decimal [not null, default: 0]
+  totalAmount Decimal [not null]
+  shippingAddress String [not null]
+  note String
+  paymentMethod String
+  paymentStatus PaymentStatus [not null, default: 'PENDING']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  items order_items [not null]
+  delivery deliveries
+  payment payments
+  invoice pharmacy_invoices
+}
+
+Table order_items {
+  id String [pk]
+  orderId String [not null]
+  order pharmacy_orders [not null]
+  inventoryId String [not null]
+  inventory pharmacy_inventory [not null]
+  unitId String
+  quantity Int [not null]
+  price Decimal [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table deliveries {
+  id String [pk]
+  orderId String [unique, not null]
+  order pharmacy_orders [not null]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  deliveryService String [not null]
+  deliveryServiceOrderId String
+  deliveryStaffId String
+  deliveryStaff pharmacy_staff
+  deliveryFee Decimal [not null]
+  estimatedDeliveryTime DateTime
+  actualDeliveryTime DateTime
+  status DeliveryStatus [not null, default: 'PENDING']
+  deliveryPersonName String
+  deliveryPersonPhone String
+  trackingUrl String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table payments {
+  id String [pk]
+  orderId String [unique, not null]
+  order pharmacy_orders [not null]
+  amount Decimal [not null]
+  paymentMethod String [not null]
+  status PaymentStatus [not null, default: 'PENDING']
+  transactionId String
+  paidAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table pharmacy_invoices {
+  id String [pk]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  customerId String [not null]
+  customer customers [not null]
+  orderId String [unique]
+  order pharmacy_orders
+  invoiceNumber String [unique, not null]
+  invoiceDate DateTime [default: `now()`, not null]
+  totalAmount Decimal [not null]
+  type InvoiceType [not null, default: 'ONLINE']
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  items invoice_items [not null]
+}
+
+Table purchase_invoices {
+  id String [pk]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  supplierId String
+  supplier suppliers
+  supplierName String
+  invoiceNumber String [not null]
+  invoiceDate DateTime [default: `now()`, not null]
+  totalAmount Decimal [not null]
+  status PurchaseStatus [not null, default: 'PENDING']
+  notes String
+  items purchase_items [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table purchase_items {
+  id String [pk]
+  purchaseInvoiceId String [not null]
+  purchaseInvoice purchase_invoices [not null]
+  inventoryId String [not null]
+  inventory pharmacy_inventory [not null]
+  batchCode String [not null]
+  expiryDate DateTime [not null]
+  quantity Int [not null]
+  unitPrice Decimal [not null]
+  totalPrice Decimal [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table invoice_items {
+  id String [pk]
+  invoiceId String [not null]
+  invoice pharmacy_invoices [not null]
+  inventoryId String
+  inventory pharmacy_inventory
+  quantity Int [not null]
+  price Decimal [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table pharmacy_analytics {
+  id String [pk]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  date DateTime [not null]
+  totalRevenue Decimal [not null]
+  totalOrders Int [not null]
+  totalCustomers Int [not null]
+  averageOrderValue Decimal [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+
+  indexes {
+    (pharmacyId, date) [unique]
+  }
+}
+
+Table staff_notifications {
+  id String [pk]
+  staffId String [not null]
+  staff pharmacy_staff [not null]
+  pharmacyId String [not null]
+  pharmacy pharmacies [not null]
+  type StaffNotificationType [not null]
+  title String [not null]
+  message String [not null]
+  metadata Json
+  isRead Boolean [not null, default: false]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table customer_carts {
+  id String [pk]
+  customerId String [unique, not null]
+  customer customers [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+  items cart_items [not null]
+}
+
+Table cart_items {
+  id String [pk]
+  cartId String [not null]
+  cart customer_carts [not null]
+  inventoryId String [not null]
+  inventory pharmacy_inventory [not null]
+  unitId String
+  quantity Int [not null]
+  unitPrice Decimal [not null]
+  totalPrice Decimal [not null]
+  isSelected Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table customer_health_metrics {
+  id String [pk]
+  customerId String [unique, not null]
+  customer customers [not null]
+  gender String
+  dateOfBirth DateTime
+  bloodPressureSystolic Int
+  bloodPressureDiastolic Int
+  weight Float
+  height Float
+  bmi Float
+  bmr Float
+  bloodType String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table customer_health_records {
+  id String [pk]
+  customerId String [not null]
+  customer customers [not null]
+  recordType String [not null]
+  title String [not null]
+  description String
+  dateRecorded DateTime [not null]
+  providerName String
+  fileUrl String
+  imagePublicId String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table customer_allergies {
+  id String [pk]
+  customerId String [not null]
+  customer customers [not null]
+  name String [not null]
+  description String
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table medicine_reminders {
+  id String [pk]
+  customerId String [not null]
+  customer customers [not null]
+  medicineName String [not null]
+  dosage String [not null]
+  frequencyType String [not null]
+  specificDays Json
+  intervalDays Int
+  time String [not null]
+  startDate DateTime [not null]
+  endDate DateTime
+  isActive Boolean [not null, default: true]
+  notes String
+  notifications reminder_notifications [not null]
+  logs reminder_logs [not null]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table reminder_notifications {
+  id String [pk]
+  reminderId String [not null]
+  reminder medicine_reminders [not null]
+  scheduledTime DateTime [not null]
+  status NotificationStatus [not null, default: 'PENDING']
+  pushNotificationId String
+  sentAt DateTime
+  acknowledgedAt DateTime
+  errorMessage String
+  createdAt DateTime [default: `now()`, not null]
+  logs reminder_logs [not null]
+}
+
+Table reminder_logs {
+  id String [pk]
+  reminderId String [not null]
+  reminder medicine_reminders [not null]
+  notificationId String
+  notification reminder_notifications
+  customerId String [not null]
+  customer customers [not null]
+  medicineName String [not null]
+  dosage String [not null]
+  actionType String [not null]
+  scheduledTime DateTime [not null]
+  actionTime DateTime
+  notes String
+  createdAt DateTime [default: `now()`, not null]
+}
+
+Table customer_notifications {
+  id String [pk]
+  customerId String [not null]
+  customer customers [not null]
+  type CustomerNotificationType [not null]
+  title String [not null]
+  message String [not null]
+  metadata Json
+  isRead Boolean [not null, default: false]
+  pushSent Boolean [not null, default: false]
+  pushSentAt DateTime
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Table customer_push_tokens {
+  id String [pk]
+  customerId String [not null]
+  customer customers [not null]
+  token String [unique, not null]
+  deviceType String [not null]
+  deviceId String
+  isActive Boolean [not null, default: true]
+  createdAt DateTime [default: `now()`, not null]
+  updatedAt DateTime [not null]
+}
+
+Enum StaffRole {
+  MANAGER
+  PHARMACIST
+  STAFF
+}
+
+Enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+Enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+Enum DeliveryStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+Enum InvoiceType {
+  ONLINE
+  OFFLINE
+}
+
+Enum PurchaseStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+Enum StaffNotificationType {
+  ORDER_NEW
+  ORDER_DELETED
+  CATALOG_IMPORTED
+  INVENTORY_LOW_STOCK
+  INVENTORY_EXPIRY_ALERT
+  PAYMENT_RECEIVED
+  SYSTEM_ALERT
+}
+
+Enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  ACKNOWLEDGED
+  FAILED
+}
+
+Enum CustomerNotificationType {
+  ORDER_STATUS_CHANGED
+  DELIVERY_UPDATE
+  MEDICINE_REMINDER
+}
+
+Ref: pharmacies.ownerId > owners.id
+
+Ref: global_medicine_catalog.categoryId > categories.id
+
+Ref: global_medicine_catalog.brandId > brands.id
+
+Ref: global_medicine_catalog.supplierId > suppliers.id
+
+Ref: global_medicine_catalog.pharmaRepId > pharma_sales_reps.id
+
+Ref: pharma_sales_reps.supplierId > suppliers.id
+
+Ref: storage_locations.pharmacyId > pharmacies.id
+
+Ref: pharmacy_staff.pharmacyId > pharmacies.id
+
+Ref: pharmacy_inventory.pharmacyId > pharmacies.id
+
+Ref: pharmacy_inventory.globalCatalogId > global_medicine_catalog.id
+
+Ref: pharmacy_inventory.categoryId > categories.id
+
+Ref: pharmacy_inventory.brandId > brands.id
+
+Ref: pharmacy_inventory.storageLocationId > storage_locations.id
+
+Ref: inventory_units.inventoryId > pharmacy_inventory.id [delete: Cascade]
+
+Ref: inventory_batches.inventoryId > pharmacy_inventory.id [delete: Cascade]
+
+Ref: pharmacy_orders.pharmacyId > pharmacies.id
+
+Ref: pharmacy_orders.customerId > customers.id
+
+Ref: order_items.orderId > pharmacy_orders.id [delete: Cascade]
+
+Ref: order_items.inventoryId > pharmacy_inventory.id
+
+Ref: deliveries.orderId - pharmacy_orders.id
+
+Ref: deliveries.pharmacyId > pharmacies.id
+
+Ref: deliveries.deliveryStaffId > pharmacy_staff.id
+
+Ref: payments.orderId - pharmacy_orders.id
+
+Ref: pharmacy_invoices.pharmacyId > pharmacies.id
+
+Ref: pharmacy_invoices.customerId > customers.id
+
+Ref: pharmacy_invoices.orderId - pharmacy_orders.id
+
+Ref: purchase_invoices.pharmacyId > pharmacies.id
+
+Ref: purchase_invoices.supplierId > suppliers.id
+
+Ref: purchase_items.purchaseInvoiceId > purchase_invoices.id [delete: Cascade]
+
+Ref: purchase_items.inventoryId > pharmacy_inventory.id
+
+Ref: invoice_items.invoiceId > pharmacy_invoices.id [delete: Cascade]
+
+Ref: invoice_items.inventoryId > pharmacy_inventory.id
+
+Ref: pharmacy_analytics.pharmacyId > pharmacies.id
+
+Ref: staff_notifications.staffId > pharmacy_staff.id
+
+Ref: staff_notifications.pharmacyId > pharmacies.id
+
+Ref: customer_carts.customerId - customers.id
+
+Ref: cart_items.cartId > customer_carts.id [delete: Cascade]
+
+Ref: cart_items.inventoryId > pharmacy_inventory.id
+
+Ref: customer_health_metrics.customerId - customers.id
+
+Ref: customer_health_records.customerId > customers.id
+
+Ref: customer_allergies.customerId > customers.id
+
+Ref: medicine_reminders.customerId > customers.id
+
+Ref: reminder_notifications.reminderId > medicine_reminders.id
+
+Ref: reminder_logs.reminderId > medicine_reminders.id
+
+Ref: reminder_logs.notificationId > reminder_notifications.id
+
+Ref: reminder_logs.customerId > customers.id
+
+Ref: customer_notifications.customerId > customers.id
+
+Ref: customer_push_tokens.customerId > customers.id
