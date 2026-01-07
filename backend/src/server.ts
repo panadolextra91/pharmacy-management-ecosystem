@@ -45,6 +45,7 @@ import salesRoutes from './modules/sales/routes';
 import inventoryRoutes from './modules/inventory/routes';
 import analyticsRoutes from './modules/analytics/routes';
 import customerRoutes from './modules/customers/routes';
+import reminderRoutes from './modules/reminders/routes';
 
 app.get('/api', (_req, res) => {
   res.json({
@@ -62,6 +63,7 @@ app.use('/api/purchases', purchaseRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/reminders', reminderRoutes);
 
 // Error handling (must be last)
 app.use(errorHandler);
@@ -71,7 +73,21 @@ const PORT = env.PORT;
 app.listen(PORT, () => {
   logger.info(`🚀 Server running on port ${PORT}`);
   logger.info(`📝 Environment: ${env.NODE_ENV}`);
+
+  // Initialize Workers
+  if (process.env.NODE_ENV !== 'test') { // Don't run in tests
+    require('./workers/notification.worker'); // Just import to register worker
+    const { runScheduler } = require('./workers/scheduler.worker');
+    const { runMissedCheck } = require('./workers/missed-check.worker');
+
+    logger.info('👷 Initializing Background Workers...');
+
+    // Cron-like behavior (Simple Interval for MVP)
+    setInterval(runScheduler, 60 * 1000); // Every minute
+    setInterval(runMissedCheck, 5 * 60 * 1000); // Every 5 minutes
+
+    logger.info('✅ Workers started');
+  }
 });
 
 export default app;
-
