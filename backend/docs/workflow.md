@@ -54,6 +54,11 @@ This document outlines the core workflows of the Pharmacy Management System, det
 
 ---
 
+## 4.- **Sales & Point of Sale (POS)**: Core transaction flow, Receipt generation.
+- **Analytics & Reporting**: Dashboard stats, Charts, Advanced Reports (P&L, Top Selling).
+- **Customer Management (CRM)**: Identify customers, Track health info, View purchase history.
+- **Medicine Reminders** (Planned Phase 6).
+
 ## 4. Sales & Point of Sale (POS)
 
 **Actors**: Staff, Customer
@@ -106,7 +111,32 @@ This document outlines the core workflows of the Pharmacy Management System, det
     *   **Top Selling**: System aggregates most sold items.
     *   **Valuation**: System sums value of current stock (`quantity * purchasePrice`).
 
-## 6. Medicine Reminders (Future)
+## 6. Customer Management (CRM)
+
+### Search & Profile
+1.  **Staff** enters Name or Phone in search bar.
+2.  **System** searches Global Customer DB.
+3.  **Staff** selects customer -> views Profile (Age, Gender, Metrics) + Recent Orders at *this* pharmacy.
+
+### Health Tracking
+1.  **Staff** clicks "Add Vital" -> Enters Weight/BP -> System saves to `CustomerHealthMetrics` (History required? Currently overwrites/adds latest).
+    *   *Note*: Our schema stores single `CustomerHealthMetrics` row per customer? No, it's 1:1 relation currently defined in schema, but typical pattern creates new rows for history.
+    *   *Correction*: Schema has `CustomerHealthMetrics` as 1:1 (`customerId` @unique). So it updates *current* stats.
+2.  **Staff** clicks "Add Allergy" -> System adds to `CustomerAllergy`.
+
+### Customer Portal (Mobile App Self-Service)
+1.  **Customer** logs in via Phone/OTP.
+2.  **Customer** views **Global History** -> System returns orders from any pharmacy they visited.
+3.  **Customer** updates Health -> "My Weight is 70kg" -> System upserts `CustomerHealthMetric`.
+4.  **Customer** manages Allergies -> Deletes "Peanuts" (Mistake) -> System removes record.
+
+### Staff Management (Owner Exclusive)
+1.  **Pharmacy Owner** logs in.
+2.  **Owner** goes to "Staff" tab -> Creates new account for Pharmacist.
+3.  **System** validates `role=OWNER` -> Creates staff linked to Owner's pharmacy.
+    *   *Note*: Regular Managers/Staff cannot access this module.
+
+## 7. Medicine Reminders (Phase 6)
 
 **Actors**: Customer, System
 

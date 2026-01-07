@@ -91,3 +91,36 @@
 | GET | `/profit-loss` | **P&L Report**. Query: `startDate`, `endDate` (YYYY-MM-DD). Returns Revenue, COGS (Est), Gross Profit. | Yes |
 | GET | `/top-selling` | **Top Products**. Query: `limit`. Returns most sold items. | Yes |
 | GET | `/inventory-valuation` | **Warehouse Value**. Returns Total Asset Value (Cost Basis). | Yes |
+
+## 5. Customer Management (CRM)
+
+### Base Path: `/api/customers`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/` | **Search**. Query: `search` (name/phone), `page`, `limit`. | Yes |
+| POST | `/` | **Create**. Body: `{ phone, fullName, email?, dateOfBirth?, gender? }`. | Yes |
+| GET | `/:id` | **Get Profile**. Returns details + recent orders + health linked to *this* pharmacy. | Yes |
+
+### Customer Portal (Mobile App)
+**Base Path**: `/api/customers/me`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/` | **Get My Profile**. View own profile, metrics, allergies. | Yes (Customer) |
+| PATCH | `/` | **Update Me**. Update Name, Email. (Phone is immutable). | Yes (Customer) |
+| GET | `/history` | **My History**. View GLOBAL purchase history across ALL pharmacies. | Yes (Customer) |
+| POST | `/metrics` | **Add Metric**. Upsert health metric (Weight, BP, etc). | Yes (Customer) |
+| DELETE | `/allergies/:id` | **Delete Allergy**. Remove an allergy record. | Yes (Customer) |
+| DELETE | `/records/:id` | **Delete Record**. Remove a medical record. | Yes (Customer) |
+
+## 6. Access Control & Staff Management
+
+### Base Path: `/api`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| POST | `/staff/register` | **Create Staff**. **OWNER ONLY**. Register new staff for pharmacy. | Yes (Owner) |
+| GET | `/staff` | **List Staff**. **OWNER ONLY**. View all staff. | Yes (Owner) |
+| PATCH | `/staff/:id` | **Update Staff**. **OWNER ONLY**. Edit staff details/role. | Yes (Owner) |
+| DELETE | `/staff/:id` | **Remove Staff**. **OWNER ONLY**. Deactivate/Delete staff. | Yes (Owner) |
