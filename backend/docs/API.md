@@ -16,6 +16,9 @@
 | POST | `/refresh-token` | Refresh Access Token | No |
 | POST | `/logout` | Logout (Invalidate Refresh Token) | No |
 | POST | `/verify-otp` | Verify OTP (for registration/login) | No |
+| GET | `/staff` | List all staff members (Manager/Owner only) | Yes |
+| PATCH | `/staff/:id` | Update staff details (Role, Status) | Yes |
+| DELETE | `/staff/:id` | Deactivate staff member | Yes |
 
 ## Global Medicine Catalog (`/api/catalog`)
 *Managed by Platform Admins & Pharma Reps. Shared across all pharmacies.*
@@ -77,3 +80,14 @@
 | GET | `/:id` | Get invoice details (includes items) | Yes |
 | POST | `/` | Create new purchase invoice (Digitalize Bill) | Yes |
 | PATCH | `/:id/status` | Update status (e.g., PENDING -> CONFIRMED). **CONFIRMED adds stock.** | Yes |
+
+## Analytics (`/api/analytics`)
+*Scoped to specific Pharmacy. Requires `pharmacyId` context.*
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/dashboard` | Get Today's Stats (Revenue, Orders, Low Stock, Customers) | Yes |
+| GET | `/revenue-chart` | Get Revenue Chart data (Query: `days`, default 7) | Yes |
+| GET | `/profit-loss` | **P&L Report**. Query: `startDate`, `endDate` (YYYY-MM-DD). Returns Revenue, COGS (Est), Gross Profit. | Yes |
+| GET | `/top-selling` | **Top Products**. Query: `limit`. Returns most sold items. | Yes |
+| GET | `/inventory-valuation` | **Warehouse Value**. Returns Total Asset Value (Cost Basis). | Yes |

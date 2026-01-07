@@ -91,7 +91,22 @@ This document outlines the core workflows of the Pharmacy Management System, det
 
 ---
 
-## 5. Medicine Reminders (Future)
+## 5. Analytics & Staff Management
+2.  **Staff Management**:
+    1.  **Owner** lists staff members (`GET /auth/staff`).
+    2.  **Owner** updates role/status (`PATCH /auth/staff/:id`).
+    3.  **Owner** deactivates account (`DELETE /auth/staff/:id`).
+
+### Analytics Dashboard
+1.  **System** aggregates today's data (`GET /api/analytics/dashboard`).
+    *   Revenue, Orders, Low Stock Items.
+2.  **System** calculates Revenue Chart data (`GET /api/analytics/revenue-chart`).
+3.  **Owner** requests Advanced Reports:
+    *   **P&L**: System calculates Revenue vs Estimated COGS (Weighted Avg) for date range.
+    *   **Top Selling**: System aggregates most sold items.
+    *   **Valuation**: System sums value of current stock (`quantity * purchasePrice`).
+
+## 6. Medicine Reminders (Future)
 
 **Actors**: Customer, System
 

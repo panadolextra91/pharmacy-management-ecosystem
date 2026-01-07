@@ -388,6 +388,7 @@ Table pharmacy_analytics {
   pharmacy pharmacies [not null]
   date DateTime [not null]
   totalRevenue Decimal [not null]
+  totalProfit Decimal [not null, default: 0]
   totalOrders Int [not null]
   totalCustomers Int [not null]
   averageOrderValue Decimal [not null]

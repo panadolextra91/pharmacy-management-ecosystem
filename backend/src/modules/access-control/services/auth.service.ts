@@ -96,6 +96,12 @@ export class AuthService {
     const accessToken = generateAccessToken(tokenPayload);
     const refreshToken = generateRefreshToken(tokenPayload);
 
+    // Fetch pharmacies
+    const pharmacies = await prisma.pharmacy.findMany({
+      where: { ownerId: owner.id, isActive: true },
+      select: { id: true, name: true }
+    });
+
     return {
       success: true,
       data: {
@@ -104,6 +110,7 @@ export class AuthService {
           email: owner.email,
           name: owner.name,
           role: 'OWNER',
+          pharmacies,
         },
         accessToken,
         refreshToken,
@@ -437,10 +444,10 @@ export class AuthService {
   // Refresh Token
   async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
     const { verifyRefreshToken } = await import('../../../shared/utils/jwt');
-    
+
     try {
       const payload = verifyRefreshToken(refreshToken);
-      
+
       // Generate new tokens
       const newAccessToken = generateAccessToken(payload);
       const newRefreshToken = generateRefreshToken(payload);

@@ -43,6 +43,7 @@ import authRoutes from './modules/access-control/routes';
 import catalogRoutes from './modules/catalog/routes';
 import salesRoutes from './modules/sales/routes';
 import inventoryRoutes from './modules/inventory/routes';
+import analyticsRoutes from './modules/analytics/routes';
 
 app.get('/api', (_req, res) => {
   res.json({
@@ -58,6 +59,7 @@ app.use('/api/catalog', catalogRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/purchases', purchaseRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Error handling (must be last)
 app.use(errorHandler);

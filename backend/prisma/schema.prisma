@@ -582,6 +582,7 @@ model PharmacyAnalytics {
   pharmacy          Pharmacy @relation(fields: [pharmacyId], references: [id])
   date              DateTime @db.Date
   totalRevenue      Decimal  @db.Decimal(10, 2) @map("total_revenue")
+  totalProfit       Decimal  @db.Decimal(10, 2) @default(0) @map("total_profit") // Revenue - COGS
   totalOrders       Int      @map("total_orders")
   totalCustomers    Int      @map("total_customers")
   averageOrderValue Decimal  @db.Decimal(10, 2) @map("average_order_value")
