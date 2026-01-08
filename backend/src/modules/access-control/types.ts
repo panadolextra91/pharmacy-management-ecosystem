@@ -69,6 +69,7 @@ export interface AuthResponse {
       name?: string;
       role?: string;
       pharmacyId?: string;
+      pharmacies?: any[];
     };
     accessToken: string;
     refreshToken: string;

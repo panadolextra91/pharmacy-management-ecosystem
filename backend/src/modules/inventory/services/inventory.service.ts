@@ -120,7 +120,7 @@ export class InventoryService {
         });
     }
 
-    async addStock(inventoryId: string, pharmacyId: string, data: { batchNumber: string; expiryDate: string; quantity: number }, tx?: Prisma.TransactionClient) {
+    async addStock(inventoryId: string, pharmacyId: string, data: { batchCode: string; expiryDate: string; quantity: number }, tx?: Prisma.TransactionClient) {
         // 1. Verify existence and ownership (pass tx)
         await this.findById(inventoryId, pharmacyId, tx);
 
@@ -129,7 +129,7 @@ export class InventoryService {
             let batch = await client.inventoryBatch.findFirst({
                 where: {
                     inventoryId,
-                    batchCode: data.batchNumber,
+                    batchCode: data.batchCode,
                 },
             });
 
@@ -146,7 +146,7 @@ export class InventoryService {
                 batch = await client.inventoryBatch.create({
                     data: {
                         inventoryId,
-                        batchCode: data.batchNumber,
+                        batchCode: data.batchCode,
                         expiryDate: new Date(data.expiryDate),
                         stockQuantity: data.quantity,
                     },
@@ -175,7 +175,7 @@ export class InventoryService {
             throw new AppError('Insufficient stock', 400, 'INSUFFICIENT_STOCK');
         }
 
-        return prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             let remainingToDeduct = quantity;
 
             // FIFO: Get batches with stock, ordered by expiry
@@ -206,8 +206,23 @@ export class InventoryService {
                 data: { totalStockLevel: { decrement: quantity } }
             });
 
-            return { totalStockLevel: updatedInventory.totalStockLevel };
+            return updatedInventory;
         });
+
+        // Trigger Low Stock Alert
+        if (result.totalStockLevel <= result.minStockLevel) {
+            import('../../notifications/services/staff-notification.service').then(service => {
+                service.default.notifyPharmacy(
+                    pharmacyId,
+                    'INVENTORY_LOW_STOCK',
+                    'Low Stock Alert',
+                    `Item '${inventory.name}' is low on stock (${result.totalStockLevel} left).`,
+                    { inventoryId: result.id, currentStock: result.totalStockLevel }
+                );
+            }).catch(err => console.error('Failed to send notification', err));
+        }
+
+        return { totalStockLevel: result.totalStockLevel };
     }
 
     async getExpiryAlerts(pharmacyId: string, days: number = 30) {

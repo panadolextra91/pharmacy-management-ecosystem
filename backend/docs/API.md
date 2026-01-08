@@ -16,6 +16,9 @@
 | POST | `/refresh-token` | Refresh Access Token | No |
 | POST | `/logout` | Logout (Invalidate Refresh Token) | No |
 | POST | `/verify-otp` | Verify OTP (for registration/login) | No |
+| GET | `/staff` | List all staff members (Manager/Owner only) | Yes |
+| PATCH | `/staff/:id` | Update staff details (Role, Status) | Yes |
+| DELETE | `/staff/:id` | Deactivate staff member | Yes |
 
 ## Global Medicine Catalog (`/api/catalog`)
 *Managed by Platform Admins & Pharma Reps. Shared across all pharmacies.*
@@ -34,6 +37,7 @@
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
 | POST | `/orders` | Create new Order. Supports POS (Walk-in) via `isPosSale: true`. Triggers Stock Deduction & Invoice. | Yes |
+| GET | `/invoices/:id/receipt` | Get structured receipt data (JSON) for printing/PDF generation. | Yes |
 
 ## Inventory Management (`/api/inventory`)
 *Scoped to specific Pharmacy. Requires `pharmacyId` context.*
@@ -76,3 +80,80 @@
 | GET | `/:id` | Get invoice details (includes items) | Yes |
 | POST | `/` | Create new purchase invoice (Digitalize Bill) | Yes |
 | PATCH | `/:id/status` | Update status (e.g., PENDING -> CONFIRMED). **CONFIRMED adds stock.** | Yes |
+
+## Analytics (`/api/analytics`)
+*Scoped to specific Pharmacy. Requires `pharmacyId` context.*
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/dashboard` | **Get Today's Stats**. Returns: `todayRevenue`, `todayOrders`, `lowStockCount`, `totalCustomers`. **Includes Widgets**: `lowStockItems[]` (Top 5 items), `expiringBatches[]` (Next 30 days). | Yes |
+| GET | `/revenue-chart` | Get Revenue Chart data (Query: `days`, default 7) | Yes |
+| GET | `/profit-loss` | **P&L Report**. Query: `startDate`, `endDate` (YYYY-MM-DD). Returns Revenue, COGS (Est), Gross Profit. | Yes |
+| GET | `/top-selling` | **Top Products**. Query: `limit`. Returns most sold items. | Yes |
+| GET | `/inventory-valuation` | **Warehouse Value**. Returns Total Asset Value (Cost Basis). | Yes |
+
+## 5. Customer Management (CRM)
+
+### Base Path: `/api/customers`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/` | **Search**. Query: `search` (name/phone), `page`, `limit`. | Yes |
+| POST | `/` | **Create**. Body: `{ phone, fullName, email?, dateOfBirth?, gender? }`. | Yes |
+| GET | `/:id` | **Get Profile**. Returns details + recent orders + health linked to *this* pharmacy. | Yes |
+
+### Customer Portal (Mobile App)
+**Base Path**: `/api/customers/me`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/` | **Get My Profile**. View own profile, metrics, allergies. | Yes (Customer) |
+| PATCH | `/` | **Update Me**. Update Name, Email. (Phone is immutable). | Yes (Customer) |
+| GET | `/history` | **My History**. View GLOBAL purchase history across ALL pharmacies. | Yes (Customer) |
+| POST | `/metrics` | **Add Metric**. Upsert health metric (Weight, BP, etc). | Yes (Customer) |
+| DELETE | `/allergies/:id` | **Delete Allergy**. Remove an allergy record. | Yes (Customer) |
+| DELETE | `/records/:id` | **Delete Record**. Remove a medical record. | Yes (Customer) |
+
+## 6. Access Control & Staff Management
+
+### Base Path: `/api`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| POST | `/staff/register` | **Create Staff**. **OWNER ONLY**. Register new staff for pharmacy. | Yes (Owner) |
+| GET | `/staff` | **List Staff**. **OWNER ONLY**. View all staff. | Yes (Owner) |
+| PATCH | `/staff/:id` | **Update Staff**. **OWNER ONLY**. Edit staff details/role. | Yes (Owner) |
+| DELETE | `/staff/:id` | **Remove Staff**. **OWNER ONLY**. Deactivate/Delete staff. | Yes (Owner) |
+
+## 7. Medicine Reminder System (Phase 6)
+
+### Base Path: `/api/reminders`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| POST | `/` | **Create Reminder**. Body: `{ medicineName, dosage, type, frequencyType, time, specificDays?, intervalDays?, startDate, endDate?, notes? }`. | Yes (Customer) |
+| GET | `/` | **List Reminders**. Query: `page`, `limit`, `isActive`. Returns list of active/inactive reminders. | Yes (Customer) |
+| GET | `/history` | **Adherence History**. Returns logs of Taken/Skipped/Missed actions. | Yes (Customer) |
+| GET | `/:id` | **Get Reminder**. View details of a specific reminder. | Yes (Customer) |
+| PATCH | `/:id` | **Update Reminder**. Edit schedule or details. | Yes (Customer) |
+| DELETE | `/:id` | **Delete Reminder**. Soft delete (or hard if no logs). | Yes (Customer) |
+| POST | `/:id/actions` | **Log Action**. Body: `{ actionType: 'taken'|'skipped'|'missed', notes?, notificationId? }`. Smartly links to pending notifications. | Yes (Customer) |
+| POST | `/:id/actions` | **Log Action**. Body: `{ actionType: 'taken'|'skipped'|'missed', notes?, notificationId? }`. Smartly links to pending notifications. | Yes (Customer) |
+
+## 8. Staff Notifications & Alerts (Phase 7)
+
+### Base Path: `/api/notifications`
+*Scoped to Pharmacy Staff (Manager, Pharmacist) and Owners.*
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/` | **List Notifications**. Query: `page`, `limit`, `isRead` (boolean), `type`. | Yes |
+| GET | `/unread-count` | **Badge Count**. Returns number of unread notifications. | Yes |
+| PATCH | `/:id/read` | **Mark as Read**. Mark a single notification as read. | Yes |
+| PATCH | `/read-all` | **Mark All Read**. Mark all notifications for the current user as read. | Yes |
+
+### Notification Types
+*   `ORDER_NEW`: Triggered when a new online order is placed.
+*   `INVENTORY_LOW_STOCK`: Triggered when stock falls below minimum level.
+*   `INVENTORY_EXPIRY_ALERT`: Triggered daily for batches expiring within 30 days.
+*   `CATALOG_IMPORTED`: Triggered when a new global catalog CSV is imported (Owner/Manager only).
