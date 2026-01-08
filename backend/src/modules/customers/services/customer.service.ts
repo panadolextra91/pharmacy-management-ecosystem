@@ -52,7 +52,7 @@ class CustomerService {
             data: {
                 phone: data.phone,
                 fullName: data.fullName,
-                // address: data.address, 
+                address: data.address,
                 // dateOfBirth: data.dateOfBirth, // Not in Customer model
                 // gender: data.gender, // Not in Customer model
                 email: data.email,

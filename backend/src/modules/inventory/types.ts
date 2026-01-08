@@ -68,7 +68,7 @@ export interface InventoryQueryDto {
 
 // Batch & Stock Management
 export interface AddStockDto {
-    batchNumber: string;
+    batchCode: string;
     expiryDate: string; // ISO Date
     quantity: number; // Base unit quantity
 }

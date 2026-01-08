@@ -120,7 +120,7 @@ export class InventoryService {
         });
     }
 
-    async addStock(inventoryId: string, pharmacyId: string, data: { batchNumber: string; expiryDate: string; quantity: number }, tx?: Prisma.TransactionClient) {
+    async addStock(inventoryId: string, pharmacyId: string, data: { batchCode: string; expiryDate: string; quantity: number }, tx?: Prisma.TransactionClient) {
         // 1. Verify existence and ownership (pass tx)
         await this.findById(inventoryId, pharmacyId, tx);
 
@@ -129,7 +129,7 @@ export class InventoryService {
             let batch = await client.inventoryBatch.findFirst({
                 where: {
                     inventoryId,
-                    batchCode: data.batchNumber,
+                    batchCode: data.batchCode,
                 },
             });
 
@@ -146,7 +146,7 @@ export class InventoryService {
                 batch = await client.inventoryBatch.create({
                     data: {
                         inventoryId,
-                        batchCode: data.batchNumber,
+                        batchCode: data.batchCode,
                         expiryDate: new Date(data.expiryDate),
                         stockQuantity: data.quantity,
                     },
