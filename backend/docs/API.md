@@ -86,7 +86,7 @@
 
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
-| GET | `/dashboard` | Get Today's Stats (Revenue, Orders, Low Stock, Customers) | Yes |
+| GET | `/dashboard` | **Get Today's Stats**. Returns: `todayRevenue`, `todayOrders`, `lowStockCount`, `totalCustomers`. **Includes Widgets**: `lowStockItems[]` (Top 5 items), `expiringBatches[]` (Next 30 days). | Yes |
 | GET | `/revenue-chart` | Get Revenue Chart data (Query: `days`, default 7) | Yes |
 | GET | `/profit-loss` | **P&L Report**. Query: `startDate`, `endDate` (YYYY-MM-DD). Returns Revenue, COGS (Est), Gross Profit. | Yes |
 | GET | `/top-selling` | **Top Products**. Query: `limit`. Returns most sold items. | Yes |
@@ -124,3 +124,36 @@
 | GET | `/staff` | **List Staff**. **OWNER ONLY**. View all staff. | Yes (Owner) |
 | PATCH | `/staff/:id` | **Update Staff**. **OWNER ONLY**. Edit staff details/role. | Yes (Owner) |
 | DELETE | `/staff/:id` | **Remove Staff**. **OWNER ONLY**. Deactivate/Delete staff. | Yes (Owner) |
+
+## 7. Medicine Reminder System (Phase 6)
+
+### Base Path: `/api/reminders`
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| POST | `/` | **Create Reminder**. Body: `{ medicineName, dosage, type, frequencyType, time, specificDays?, intervalDays?, startDate, endDate?, notes? }`. | Yes (Customer) |
+| GET | `/` | **List Reminders**. Query: `page`, `limit`, `isActive`. Returns list of active/inactive reminders. | Yes (Customer) |
+| GET | `/history` | **Adherence History**. Returns logs of Taken/Skipped/Missed actions. | Yes (Customer) |
+| GET | `/:id` | **Get Reminder**. View details of a specific reminder. | Yes (Customer) |
+| PATCH | `/:id` | **Update Reminder**. Edit schedule or details. | Yes (Customer) |
+| DELETE | `/:id` | **Delete Reminder**. Soft delete (or hard if no logs). | Yes (Customer) |
+| POST | `/:id/actions` | **Log Action**. Body: `{ actionType: 'taken'|'skipped'|'missed', notes?, notificationId? }`. Smartly links to pending notifications. | Yes (Customer) |
+| POST | `/:id/actions` | **Log Action**. Body: `{ actionType: 'taken'|'skipped'|'missed', notes?, notificationId? }`. Smartly links to pending notifications. | Yes (Customer) |
+
+## 8. Staff Notifications & Alerts (Phase 7)
+
+### Base Path: `/api/notifications`
+*Scoped to Pharmacy Staff (Manager, Pharmacist) and Owners.*
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/` | **List Notifications**. Query: `page`, `limit`, `isRead` (boolean), `type`. | Yes |
+| GET | `/unread-count` | **Badge Count**. Returns number of unread notifications. | Yes |
+| PATCH | `/:id/read` | **Mark as Read**. Mark a single notification as read. | Yes |
+| PATCH | `/read-all` | **Mark All Read**. Mark all notifications for the current user as read. | Yes |
+
+### Notification Types
+*   `ORDER_NEW`: Triggered when a new online order is placed.
+*   `INVENTORY_LOW_STOCK`: Triggered when stock falls below minimum level.
+*   `INVENTORY_EXPIRY_ALERT`: Triggered daily for batches expiring within 30 days.
+*   `CATALOG_IMPORTED`: Triggered when a new global catalog CSV is imported (Owner/Manager only).

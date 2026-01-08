@@ -33,11 +33,43 @@ class AnalyticsService {
             where: { pharmacyId },
         });
 
+        // 4. Low Stock Items (Widget)
+        const lowStockItems = await prisma.pharmacyInventory.findMany({
+            where: {
+                pharmacyId,
+                isActive: true,
+                totalStockLevel: { lte: prisma.pharmacyInventory.fields.minStockLevel }
+            },
+            take: 5,
+            select: { id: true, name: true, totalStockLevel: true, minStockLevel: true }
+        });
+
+        // 5. Expiring Batches (Widget - next 30 days)
+        const warningDate = dayjs().add(30, 'day').toDate();
+        const expiringBatches = await prisma.inventoryBatch.findMany({
+            where: {
+                inventory: { pharmacyId },
+                stockQuantity: { gt: 0 },
+                expiryDate: { lte: warningDate }
+            },
+            take: 5,
+            include: { inventory: { select: { name: true } } },
+            orderBy: { expiryDate: 'asc' }
+        });
+
         return {
             todayRevenue: todayOrders._sum.totalAmount || 0,
             todayOrders: todayOrders._count.id || 0,
             lowStockCount,
             totalCustomers: totalCustomers.length,
+            lowStockItems,
+            expiringBatches: expiringBatches.map(b => ({
+                id: b.id,
+                name: b.inventory.name,
+                batchCode: b.batchCode,
+                expiryDate: b.expiryDate,
+                stockQuantity: b.stockQuantity
+            })),
             lastUpdated: new Date()
         };
     }

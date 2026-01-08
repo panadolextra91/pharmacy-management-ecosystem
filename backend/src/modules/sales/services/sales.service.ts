@@ -60,7 +60,7 @@ class SalesService {
         }
 
         // 3. Create Order Transaction
-        return await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             // A. Create Order Header
             const ordernumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             const order = await tx.pharmacyOrder.create({
@@ -151,6 +151,29 @@ class SalesService {
 
             return order;
         });
+
+        // Trigger Notification (Fire & Forget)
+        if (!isPosSale) {
+            // We need to fetch pharmacy details or just rely on ID? 
+            // The service needs pharmacyId.
+            // Notify Owner + Staff
+            const message = `New order #${result.orderNumber} received ($${result.totalAmount})`;
+
+            // Note: sales.service.ts needs to import staffNotificationService
+            // We use 'require' dynamically or top-level import to avoid circular dep issues if any?
+            // Notification is a separate module, should be fine.
+            import('../../notifications/services/staff-notification.service').then(service => {
+                service.default.notifyPharmacy(
+                    pharmacyId,
+                    'ORDER_NEW',
+                    'New Order Received',
+                    message,
+                    { orderId: result.id, orderNumber: result.orderNumber }
+                );
+            }).catch(err => console.error('Failed to send notification', err));
+        }
+
+        return result;
     }
     async getReceipt(invoiceId: string, pharmacyId: string) {
         const invoice = await prisma.pharmacyInvoice.findUnique({

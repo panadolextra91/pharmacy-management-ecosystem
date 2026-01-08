@@ -138,10 +138,33 @@ This document outlines the core workflows of the Pharmacy Management System, det
 
 ## 7. Medicine Reminders (Phase 6)
 
-**Actors**: Customer, System
+**Actors**: Customer, System (Workers)
 
-1.  **Customer** sets a schedule (e.g., "Daily at 8 AM").
-2.  **System** (Worker) schedules a notification job.
-3.  **System** sends Push Notification at 8 AM.
-4.  **Customer** marks as "Taken".
-5.  **System** logs adherence.
+### A. Scheduling Workflow
+1.  **Customer** creates a reminder (e.g., "Panadol, Daily at 8:00 AM").
+2.  **System** saves `MedicineReminder` config.
+3.  **Worker (Scheduler)** runs every minute:
+    *   Finds reminders due now.
+    *   Checks if a notification is already scheduled for today.
+    *   Creates a `ReminderNotification` (Status: `PENDING`).
+    *   Adds job to `NotificationQueue` (BulMQ).
+
+### B. Notification Delivery
+1.  **Worker (Notification)** picks up job from Queue.
+2.  **System** sends Push Notification (Expo) to Customer's device.
+3.  **System** updates `ReminderNotification` status to `SENT`.
+
+### C. Adherence Tracking (Smart Linking)
+1.  **Customer** receives notification: "Time to take Panadol".
+2.  **Customer** taps "Take" (or opens app later).
+3.  **Customer** calls API `POST /api/reminders/:id/actions` (Action: `taken`).
+    *   *Option A*: App sends `notificationId` from the push payload.
+    *   *Option B*: App sends just `reminderId` -> Backend finds recent `PENDING/SENT` notification.
+4.  **System** marks `ReminderNotification` as `ACKNOWLEDGED`.
+5.  **System** creates `ReminderLog` (Type: `taken`).
+
+### D. Missed Dose Logic
+1.  **Worker (Missed Check)** runs periodically (every 5m).
+2.  **System** looks for `SENT` or `PENDING` notifications > 15 minutes old.
+3.  **System** marks `ReminderNotification` as `FAILED` (Msg: Timeout).
+4.  **System** creates `ReminderLog` (Type: `missed`).

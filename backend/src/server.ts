@@ -46,6 +46,7 @@ import inventoryRoutes from './modules/inventory/routes';
 import analyticsRoutes from './modules/analytics/routes';
 import customerRoutes from './modules/customers/routes';
 import reminderRoutes from './modules/reminders/routes';
+import notificationRoutes from './modules/notifications/routes';
 
 app.get('/api', (_req, res) => {
   res.json({
@@ -64,29 +65,38 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/notifications', notificationRoutes); // Added
 
 // Error handling (must be last)
 app.use(errorHandler);
 
-const PORT = env.PORT;
+import { runScheduler } from './workers/scheduler.worker';
+import { runMissedCheck } from './workers/missed-check.worker';
+import { runSystemAlerts } from './workers/system-alerts.worker';
 
-app.listen(PORT, () => {
-  logger.info(`🚀 Server running on port ${PORT}`);
+const PORT = env.PORT || 3000;
+
+app.listen(PORT, async () => {
+  logger.info(`Server running on port ${PORT}`);
   logger.info(`📝 Environment: ${env.NODE_ENV}`);
 
-  // Initialize Workers
-  if (process.env.NODE_ENV !== 'test') { // Don't run in tests
-    require('./workers/notification.worker'); // Just import to register worker
-    const { runScheduler } = require('./workers/scheduler.worker');
-    const { runMissedCheck } = require('./workers/missed-check.worker');
+  // Start Workers (MVP: setInterval)
+  if (process.env.NODE_ENV !== 'test') {
+    logger.info('Starting background workers...');
 
-    logger.info('👷 Initializing Background Workers...');
+    // 1. Medicine Reminder Scheduler (Every 1 min)
+    setInterval(runScheduler, 60 * 1000);
 
-    // Cron-like behavior (Simple Interval for MVP)
-    setInterval(runScheduler, 60 * 1000); // Every minute
-    setInterval(runMissedCheck, 5 * 60 * 1000); // Every 5 minutes
+    // 2. Missed Notification Checker (Every 5 mins)
+    setInterval(runMissedCheck, 5 * 60 * 1000);
 
-    logger.info('✅ Workers started');
+    // 3. System Alerts (Daily - Simple Interval for MVP: 24h)
+    setTimeout(() => {
+      runSystemAlerts();
+      setInterval(runSystemAlerts, 24 * 60 * 60 * 1000);
+    }, 60 * 1000);
+
+    logger.info('Workers started.');
   }
 });
 

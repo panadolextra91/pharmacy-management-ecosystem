@@ -175,7 +175,7 @@ export class InventoryService {
             throw new AppError('Insufficient stock', 400, 'INSUFFICIENT_STOCK');
         }
 
-        return prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx) => {
             let remainingToDeduct = quantity;
 
             // FIFO: Get batches with stock, ordered by expiry
@@ -206,8 +206,23 @@ export class InventoryService {
                 data: { totalStockLevel: { decrement: quantity } }
             });
 
-            return { totalStockLevel: updatedInventory.totalStockLevel };
+            return updatedInventory;
         });
+
+        // Trigger Low Stock Alert
+        if (result.totalStockLevel <= result.minStockLevel) {
+            import('../../notifications/services/staff-notification.service').then(service => {
+                service.default.notifyPharmacy(
+                    pharmacyId,
+                    'INVENTORY_LOW_STOCK',
+                    'Low Stock Alert',
+                    `Item '${inventory.name}' is low on stock (${result.totalStockLevel} left).`,
+                    { inventoryId: result.id, currentStock: result.totalStockLevel }
+                );
+            }).catch(err => console.error('Failed to send notification', err));
+        }
+
+        return { totalStockLevel: result.totalStockLevel };
     }
 
     async getExpiryAlerts(pharmacyId: string, days: number = 30) {
