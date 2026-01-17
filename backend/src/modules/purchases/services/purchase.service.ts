@@ -131,7 +131,7 @@ export class PurchaseService {
                         item.inventoryId,
                         pharmacyId,
                         {
-                            batchNumber: item.batchCode,
+                            batchCode: item.batchCode,
                             expiryDate: item.expiryDate.toISOString(),
                             quantity: item.quantity
                         },

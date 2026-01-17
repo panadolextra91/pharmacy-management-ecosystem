@@ -1,0 +1,735 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "./ERD.svg"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Owner {
+  id         String     @id @default(cuid())
+  email      String     @unique
+  password   String
+  name       String
+  phone      String?
+  isActive   Boolean    @default(true) @map("is_active")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  pharmacies Pharmacy[]
+
+  @@map("owners")
+}
+
+model Pharmacy {
+  id                 String              @id @default(cuid())
+  ownerId            String              @map("owner_id")
+  name               String
+  address            String
+  latitude           Float
+  longitude          Float
+  phone              String
+  email              String?
+  hours              Json
+  serviceRadius      Float               @default(10.0) @map("service_radius_km")
+  isActive           Boolean             @default(true) @map("is_active")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  deliveries         Delivery[]
+  owner              Owner               @relation(fields: [ownerId], references: [id])
+  analytics          PharmacyAnalytics[]
+  inventory          PharmacyInventory[]
+  invoices           PharmacyInvoice[]
+  orders             PharmacyOrder[]
+  staff              PharmacyStaff[]
+  purchaseInvoices   PurchaseInvoice[]
+  staffNotifications StaffNotification[]
+  storageLocations   StorageLocation[]
+
+  @@index([latitude, longitude])
+  @@index([ownerId])
+  @@map("pharmacies")
+}
+
+model Customer {
+  id                 String                 @id @default(cuid())
+  phone              String                 @unique
+  email              String?
+  password           String?
+  fullName           String?                @map("full_name")
+  address            String?
+  verified           Boolean                @default(false)
+  verifiedAt         DateTime?              @map("verified_at")
+  registrationSource String?                @map("registration_source")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+  allergies          CustomerAllergy[]
+  cart               CustomerCart?
+  healthMetrics      CustomerHealthMetrics?
+  healthRecords      CustomerHealthRecord[]
+  notifications      CustomerNotification[]
+  pushTokens         CustomerPushToken[]
+  reminders          MedicineReminder[]
+  invoices           PharmacyInvoice[]
+  orders             PharmacyOrder[]
+  reminderLogs       ReminderLog[]
+
+  @@map("customers")
+}
+
+model GlobalMedicineCatalog {
+  id               String              @id @default(cuid())
+  name             String
+  manufacturer     String?
+  description      String?
+  packaging        String?
+  activeIngredient String?             @map("active_ingredient")
+  barcode          String?
+  categoryId       String?             @map("category_id")
+  brandId          String?             @map("brand_id")
+  supplierId       String              @map("supplier_id")
+  pharmaRepId      String              @map("pharma_rep_id")
+  createdAt        DateTime            @default(now()) @map("created_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+  unitPrice        Decimal?            @map("unit_price") @db.Decimal(10, 2)
+  brand            Brand?              @relation(fields: [brandId], references: [id])
+  category         Category?           @relation(fields: [categoryId], references: [id])
+  pharmaRep        PharmaSalesRep      @relation(fields: [pharmaRepId], references: [id])
+  supplier         Supplier            @relation(fields: [supplierId], references: [id])
+  inventoryItems   PharmacyInventory[]
+
+  @@index([name])
+  @@index([manufacturer, brandId])
+  @@index([supplierId])
+  @@map("global_medicine_catalog")
+}
+
+model PharmaSalesRep {
+  id           String                  @id @default(cuid())
+  name         String
+  email        String                  @unique
+  phone        String
+  supplierId   String                  @map("supplier_id")
+  isActive     Boolean                 @default(true) @map("is_active")
+  createdAt    DateTime                @default(now()) @map("created_at")
+  updatedAt    DateTime                @updatedAt @map("updated_at")
+  catalogItems GlobalMedicineCatalog[]
+  supplier     Supplier                @relation(fields: [supplierId], references: [id])
+
+  @@map("pharma_sales_reps")
+}
+
+model Supplier {
+  id                String                  @id @default(cuid())
+  name              String
+  contactInfo       Json                    @map("contact_info")
+  address           String
+  createdAt         DateTime                @default(now()) @map("created_at")
+  updatedAt         DateTime                @updatedAt @map("updated_at")
+  catalogItems      GlobalMedicineCatalog[]
+  salesReps         PharmaSalesRep[]
+	purchaseInvoices PurchaseInvoice[]
+
+  @@map("suppliers")
+}
+
+model Category {
+  id             String                  @id @default(cuid())
+  name           String                  @unique
+  description    String?
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  catalogItems   GlobalMedicineCatalog[]
+  inventoryItems PharmacyInventory[]
+
+  @@map("categories")
+}
+
+model Brand {
+  id             String                  @id @default(cuid())
+  name           String                  @unique
+  manufacturer   String?
+  country        String?
+  logo           String?
+  imagePublicId  String?                 @map("image_public_id")
+  description    String?
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+  catalogItems   GlobalMedicineCatalog[]
+  inventoryItems PharmacyInventory[]
+
+  @@map("brands")
+}
+
+model News {
+  id            String   @id @default(cuid())
+  title         String
+  category      String
+  content       String
+  image         String?
+  imagePublicId String?  @map("image_public_id")
+  readingTime   Int      @map("reading_time")
+  summary       String?
+  isFeatured    Boolean  @default(false) @map("is_featured")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("news")
+}
+
+model Otp {
+  id        String   @id @default(cuid())
+  phone     String
+  otp       String
+  expiresAt DateTime @map("expires_at")
+  isUsed    Boolean  @default(false) @map("is_used")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([phone, isUsed, expiresAt])
+  @@map("otps")
+}
+
+model StorageLocation {
+  id             String              @id @default(cuid())
+  pharmacyId     String              @map("pharmacy_id")
+  name           String
+  description    String?
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  inventoryItems PharmacyInventory[]
+  pharmacy       Pharmacy            @relation(fields: [pharmacyId], references: [id])
+
+  @@unique([pharmacyId, name])
+  @@index([pharmacyId])
+  @@map("storage_locations")
+}
+
+model PharmacyStaff {
+  id             String              @id @default(cuid())
+  pharmacyId     String              @map("pharmacy_id")
+  username       String
+  password       String
+  name           String
+  email          String              @unique
+  role           StaffRole
+  avatar         String?
+  avatarPublicId String?             @map("avatar_public_id")
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+  deliveries     Delivery[]
+  pharmacy       Pharmacy            @relation(fields: [pharmacyId], references: [id])
+  notifications  StaffNotification[]
+
+  @@index([pharmacyId])
+  @@index([email])
+  @@map("pharmacy_staff")
+}
+
+model PharmacyInventory {
+  id                String                 @id @default(cuid())
+  pharmacyId        String                 @map("pharmacy_id")
+  globalCatalogId   String?                @map("global_catalog_id")
+  name              String
+  description       String?
+  image             String?
+  imagePublicId     String?                @map("image_public_id")
+  categoryId        String?                @map("category_id")
+  brandId           String?                @map("brand_id")
+  storageLocationId String?                @map("storage_location_id")
+  totalStockLevel   Int                    @default(0) @map("total_stock_level")
+  isActive          Boolean                @default(true) @map("is_active")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+  minStockLevel     Int                    @default(10) @map("min_stock_level")
+  cartItems         CartItem[]
+  batches           InventoryBatch[]
+  units             InventoryUnit[]
+  invoiceItems      InvoiceItem[]
+  orderItems        OrderItem[]
+  brand             Brand?                 @relation(fields: [brandId], references: [id])
+  category          Category?              @relation(fields: [categoryId], references: [id])
+  globalCatalog     GlobalMedicineCatalog? @relation(fields: [globalCatalogId], references: [id])
+  pharmacy          Pharmacy               @relation(fields: [pharmacyId], references: [id])
+  storageLocation   StorageLocation?       @relation(fields: [storageLocationId], references: [id])
+  purchaseItems    PurchaseItem[]
+
+  @@index([pharmacyId, name])
+  @@index([pharmacyId, isActive])
+  @@index([pharmacyId, categoryId])
+  @@index([storageLocationId])
+  @@map("pharmacy_inventory")
+}
+
+model InventoryUnit {
+  id               String            @id @default(cuid())
+  inventoryId      String            @map("inventory_id")
+  name             String
+  conversionFactor Int               @map("conversion_factor")
+  price            Decimal           @db.Decimal(10, 2)
+  isBaseUnit       Boolean           @default(false) @map("is_base_unit")
+  isDefaultSelling Boolean           @default(false) @map("is_default_selling")
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  inventory        PharmacyInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryId, name])
+  @@map("inventory_units")
+}
+
+model InventoryBatch {
+  id            String            @id @default(cuid())
+  inventoryId   String            @map("inventory_id")
+  batchCode     String            @map("batch_code")
+  expiryDate    DateTime          @map("expiry_date")
+  stockQuantity Int               @map("stock_quantity")
+  purchasePrice Decimal?          @map("purchase_price") @db.Decimal(10, 2)
+  purchaseDate  DateTime?         @map("purchase_date")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  inventory     PharmacyInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId, expiryDate])
+  @@index([expiryDate])
+  @@map("inventory_batches")
+}
+
+model PharmacyOrder {
+  id              String           @id @default(cuid())
+  pharmacyId      String           @map("pharmacy_id")
+  customerId      String           @map("customer_id")
+  orderNumber     String           @unique @map("order_number")
+  status          OrderStatus      @default(PENDING)
+  subtotal        Decimal          @db.Decimal(10, 2)
+  deliveryFee     Decimal          @default(0) @map("delivery_fee") @db.Decimal(10, 2)
+  totalAmount     Decimal          @map("total_amount") @db.Decimal(10, 2)
+  shippingAddress String           @map("shipping_address")
+  note            String?
+  paymentMethod   String?          @map("payment_method")
+  paymentStatus   PaymentStatus    @default(PENDING) @map("payment_status")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  delivery        Delivery?
+  items           OrderItem[]
+  payment         Payment?
+  invoice         PharmacyInvoice?
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  pharmacy        Pharmacy         @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId, status])
+  @@index([customerId])
+  @@index([orderNumber])
+  @@index([createdAt])
+  @@map("pharmacy_orders")
+}
+
+model OrderItem {
+  id          String            @id @default(cuid())
+  orderId     String            @map("order_id")
+  inventoryId String            @map("inventory_id")
+  unitId      String?           @map("unit_id")
+  quantity    Int
+  price       Decimal           @db.Decimal(10, 2)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  inventory   PharmacyInventory @relation(fields: [inventoryId], references: [id])
+  order       PharmacyOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
+}
+
+model Delivery {
+  id                     String         @id @default(cuid())
+  orderId                String         @unique @map("order_id")
+  pharmacyId             String         @map("pharmacy_id")
+  deliveryService        String         @map("delivery_service")
+  deliveryServiceOrderId String?        @map("delivery_service_order_id")
+  deliveryFee            Decimal        @map("delivery_fee") @db.Decimal(10, 2)
+  estimatedDeliveryTime  DateTime?      @map("estimated_delivery_time")
+  actualDeliveryTime     DateTime?      @map("actual_delivery_time")
+  status                 DeliveryStatus @default(PENDING)
+  deliveryPersonName     String?        @map("delivery_person_name")
+  deliveryPersonPhone    String?        @map("delivery_person_phone")
+  trackingUrl            String?        @map("tracking_url")
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+  deliveryStaffId        String?        @map("delivery_staff_id")
+  deliveryStaff          PharmacyStaff? @relation(fields: [deliveryStaffId], references: [id])
+  order                  PharmacyOrder  @relation(fields: [orderId], references: [id])
+  pharmacy               Pharmacy       @relation(fields: [pharmacyId], references: [id])
+
+  @@index([deliveryStaffId])
+  @@map("deliveries")
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  orderId       String        @unique @map("order_id")
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentMethod String        @map("payment_method")
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @map("transaction_id")
+  paidAt        DateTime?     @map("paid_at")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  order         PharmacyOrder @relation(fields: [orderId], references: [id])
+
+  @@map("payments")
+}
+
+model PharmacyInvoice {
+  id            String         @id @default(cuid())
+  pharmacyId    String         @map("pharmacy_id")
+  customerId    String         @map("customer_id")
+  orderId       String?        @unique @map("order_id")
+  invoiceNumber String         @unique @map("invoice_number")
+  invoiceDate   DateTime       @default(now()) @map("invoice_date")
+  totalAmount   Decimal        @map("total_amount") @db.Decimal(10, 2)
+  type          InvoiceType    @default(ONLINE)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  items         InvoiceItem[]
+  customer      Customer       @relation(fields: [customerId], references: [id])
+  order         PharmacyOrder? @relation(fields: [orderId], references: [id])
+  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId])
+  @@index([customerId])
+  @@index([invoiceNumber])
+  @@map("pharmacy_invoices")
+}
+
+model InvoiceItem {
+  id          String             @id @default(cuid())
+  invoiceId   String             @map("invoice_id")
+  inventoryId String?            @map("inventory_id")
+  quantity    Int
+  price       Decimal            @db.Decimal(10, 2)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+  inventory   PharmacyInventory? @relation(fields: [inventoryId], references: [id])
+  invoice     PharmacyInvoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+model PharmacyAnalytics {
+  id                String   @id @default(cuid())
+  pharmacyId        String   @map("pharmacy_id")
+  date              DateTime @db.Date
+  totalRevenue      Decimal  @map("total_revenue") @db.Decimal(10, 2)
+  totalOrders       Int      @map("total_orders")
+  totalCustomers    Int      @map("total_customers")
+  averageOrderValue Decimal  @map("average_order_value") @db.Decimal(10, 2)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  total_profit      Decimal  @default(0) @db.Decimal(10, 2)
+  pharmacy          Pharmacy @relation(fields: [pharmacyId], references: [id])
+
+  @@unique([pharmacyId, date])
+  @@index([pharmacyId, date])
+  @@map("pharmacy_analytics")
+}
+
+model StaffNotification {
+  id         String                @id @default(cuid())
+  staffId    String                @map("staff_id")
+  pharmacyId String                @map("pharmacy_id")
+  type       StaffNotificationType
+  title      String
+  message    String
+  metadata   Json?
+  isRead     Boolean               @default(false) @map("is_read")
+  createdAt  DateTime              @default(now()) @map("created_at")
+  updatedAt  DateTime              @updatedAt @map("updated_at")
+  pharmacy   Pharmacy              @relation(fields: [pharmacyId], references: [id])
+  staff      PharmacyStaff         @relation(fields: [staffId], references: [id])
+
+  @@index([pharmacyId, isRead])
+  @@index([staffId, isRead])
+  @@index([pharmacyId, type, createdAt])
+  @@index([createdAt])
+  @@map("staff_notifications")
+}
+
+model CustomerCart {
+  id         String     @id @default(cuid())
+  customerId String     @unique @map("customer_id")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  items      CartItem[]
+  customer   Customer   @relation(fields: [customerId], references: [id])
+
+  @@map("customer_carts")
+}
+
+model CartItem {
+  id          String            @id @default(cuid())
+  cartId      String            @map("cart_id")
+  inventoryId String            @map("inventory_id")
+  unitId      String?           @map("unit_id")
+  quantity    Int
+  unitPrice   Decimal           @map("unit_price") @db.Decimal(10, 2)
+  totalPrice  Decimal           @map("total_price") @db.Decimal(10, 2)
+  isSelected  Boolean           @default(true) @map("is_selected")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+  cart        CustomerCart      @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  inventory   PharmacyInventory @relation(fields: [inventoryId], references: [id])
+
+  @@map("cart_items")
+}
+
+model CustomerHealthMetrics {
+  id                     String    @id @default(cuid())
+  customerId             String    @unique @map("customer_id")
+  gender                 String?
+  dateOfBirth            DateTime? @map("date_of_birth")
+  bloodPressureSystolic  Int?      @map("blood_pressure_systolic")
+  bloodPressureDiastolic Int?      @map("blood_pressure_diastolic")
+  weight                 Float?
+  height                 Float?
+  bmi                    Float?
+  bmr                    Float?
+  bloodType              String?   @map("blood_type")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
+  customer               Customer  @relation(fields: [customerId], references: [id])
+
+  @@map("customer_health_metrics")
+}
+
+model CustomerHealthRecord {
+  id            String   @id @default(cuid())
+  customerId    String   @map("customer_id")
+  recordType    String   @map("record_type")
+  title         String
+  description   String?
+  dateRecorded  DateTime @map("date_recorded")
+  providerName  String?  @map("provider_name")
+  fileUrl       String?  @map("file_url")
+  imagePublicId String?  @map("image_public_id")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  customer      Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("customer_health_records")
+}
+
+model CustomerAllergy {
+  id          String   @id @default(cuid())
+  customerId  String   @map("customer_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  customer    Customer @relation(fields: [customerId], references: [id])
+
+  @@map("customer_allergies")
+}
+
+model MedicineReminder {
+  id            String                 @id @default(cuid())
+  customerId    String                 @map("customer_id")
+  medicineName  String                 @map("medicine_name")
+  dosage        String
+  frequencyType String                 @map("frequency_type")
+  specificDays  Json?                  @map("specific_days")
+  intervalDays  Int?                   @map("interval_days")
+  time          String
+  startDate     DateTime               @map("start_date")
+  endDate       DateTime?              @map("end_date")
+  isActive      Boolean                @default(true) @map("is_active")
+  notes         String?
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt @map("updated_at")
+  customer      Customer               @relation(fields: [customerId], references: [id])
+  logs          ReminderLog[]
+  notifications ReminderNotification[]
+
+  @@index([customerId, isActive])
+  @@index([time])
+  @@map("medicine_reminders")
+}
+
+model ReminderNotification {
+  id                 String             @id @default(cuid())
+  reminderId         String             @map("reminder_id")
+  scheduledTime      DateTime           @map("scheduled_time")
+  status             NotificationStatus @default(PENDING)
+  pushNotificationId String?            @map("push_notification_id")
+  sentAt             DateTime?          @map("sent_at")
+  acknowledgedAt     DateTime?          @map("acknowledged_at")
+  errorMessage       String?            @map("error_message")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  logs               ReminderLog[]
+  reminder           MedicineReminder   @relation(fields: [reminderId], references: [id])
+
+  @@index([status, scheduledTime])
+  @@map("reminder_notifications")
+}
+
+model ReminderLog {
+  id             String                @id @default(cuid())
+  reminderId     String                @map("reminder_id")
+  notificationId String?               @map("notification_id")
+  customerId     String                @map("customer_id")
+  medicineName   String                @map("medicine_name")
+  dosage         String
+  actionType     String                @map("action_type")
+  scheduledTime  DateTime              @map("scheduled_time")
+  actionTime     DateTime?             @map("action_time")
+  notes          String?
+  createdAt      DateTime              @default(now()) @map("created_at")
+  customer       Customer              @relation(fields: [customerId], references: [id])
+  notification   ReminderNotification? @relation(fields: [notificationId], references: [id])
+  reminder       MedicineReminder      @relation(fields: [reminderId], references: [id])
+
+  @@index([customerId, scheduledTime])
+  @@map("reminder_logs")
+}
+
+model CustomerNotification {
+  id         String                   @id @default(cuid())
+  customerId String                   @map("customer_id")
+  type       CustomerNotificationType
+  title      String
+  message    String
+  metadata   Json?
+  isRead     Boolean                  @default(false) @map("is_read")
+  createdAt  DateTime                 @default(now()) @map("created_at")
+  updatedAt  DateTime                 @updatedAt @map("updated_at")
+  pushSent   Boolean                  @default(false) @map("push_sent")
+  pushSentAt DateTime?                @map("push_sent_at")
+  customer   Customer                 @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, isRead])
+  @@index([createdAt])
+  @@map("customer_notifications")
+}
+
+model CustomerPushToken {
+  id         String   @id @default(cuid())
+  customerId String   @map("customer_id")
+  token      String   @unique
+  deviceType String   @map("device_type")
+  deviceId   String?  @map("device_id")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId, isActive])
+  @@map("customer_push_tokens")
+}
+
+model PurchaseInvoice {
+  id            String         @id @default(cuid())
+  pharmacyId    String         @map("pharmacy_id")
+  supplierId    String?        @map("supplier_id")
+  supplierName  String?        @map("supplier_name")
+  invoiceNumber String         @map("invoice_number")
+  invoiceDate   DateTime       @default(now()) @map("invoice_date")
+  totalAmount   Decimal        @map("total_amount") @db.Decimal(10, 2)
+  status        PurchaseStatus @default(PENDING)
+  notes         String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  pharmacy      Pharmacy       @relation(fields: [pharmacyId], references: [id])
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  items PurchaseItem[]
+
+  @@index([pharmacyId])
+  @@index([supplierId])
+  @@map("purchase_invoices")
+}
+
+model PurchaseItem {
+  id                String            @id @default(cuid())
+  purchaseInvoiceId String            @map("purchase_invoice_id")
+  inventoryId       String            @map("inventory_id")
+  batchCode         String            @map("batch_code")
+  expiryDate        DateTime          @map("expiry_date")
+  quantity          Int
+  unitPrice         Decimal           @map("unit_price") @db.Decimal(10, 2)
+  totalPrice        Decimal           @map("total_price") @db.Decimal(10, 2)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  inventory         PharmacyInventory @relation(fields: [inventoryId], references: [id])
+  purchaseInvoice   PurchaseInvoice   @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Cascade)
+
+  @@map("purchase_items")
+}
+
+enum StaffRole {
+  MANAGER
+  PHARMACIST
+  STAFF
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  OUT_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum DeliveryStatus {
+  PENDING
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+}
+
+enum InvoiceType {
+  ONLINE
+  OFFLINE
+}
+
+enum StaffNotificationType {
+  ORDER_NEW
+  ORDER_DELETED
+  CATALOG_IMPORTED
+  INVENTORY_LOW_STOCK
+  INVENTORY_EXPIRY_ALERT
+  PAYMENT_RECEIVED
+  SYSTEM_ALERT
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  ACKNOWLEDGED
+  FAILED
+}
+
+enum CustomerNotificationType {
+  ORDER_STATUS_CHANGED
+  DELIVERY_UPDATE
+  MEDICINE_REMINDER
+}
+
+enum PurchaseStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
