@@ -84,3 +84,27 @@ export interface TokenPayload {
   pharmacyId?: string;
 }
 
+export interface RegisterAdminDto {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface LoginAdminDto {
+  email: string;
+  password: string;
+}
+
+export interface AdminResponse {
+  success: boolean;
+  data: {
+    user: {
+      id: string;
+      email: string;
+      role: 'SYSTEM_ADMIN';
+    };
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+

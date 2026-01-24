@@ -733,3 +733,14 @@ enum PurchaseStatus {
   CONFIRMED
   CANCELLED
 }
+
+model SystemAdmin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_admins")
+}

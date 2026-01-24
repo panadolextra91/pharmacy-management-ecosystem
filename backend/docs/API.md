@@ -16,6 +16,9 @@
 | POST | `/refresh-token` | Refresh Access Token | No |
 | POST | `/logout` | Logout (Invalidate Refresh Token) | No |
 | POST | `/verify-otp` | Verify OTP (for registration/login) | No |
+| POST | `/admin/register` | Register System Admin (First setup) | No |
+| POST | `/admin/login` | Login as System Admin | No |
+| POST | `/admin/refresh` | Refresh Admin Token | No |
 | GET | `/staff` | List all staff members (Manager/Owner only) | Yes |
 | PATCH | `/staff/:id` | Update staff details (Role, Status) | Yes |
 | DELETE | `/staff/:id` | Deactivate staff member | Yes |

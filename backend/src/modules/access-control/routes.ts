@@ -12,12 +12,20 @@ import {
   sendOtpSchema,
   verifyOtpSchema,
   refreshTokenSchema,
+  registerAdminSchema,
+  loginAdminSchema,
 } from './validators';
+import * as adminController from './controllers/admin-auth.controller';
 import { authenticate } from '../../shared/middleware/auth.middleware';
 import { requirePharmacyAccess } from '../../shared/middleware/tenant.middleware';
 import { requireOwner } from '../../shared/middleware/roles.middleware';
 
 const router = Router();
+
+// Owner routes
+router.post('/admin/register', validate(registerAdminSchema), adminController.registerAdmin);
+router.post('/admin/login', validate(loginAdminSchema), adminController.loginAdmin);
+router.post('/admin/refresh', validate(refreshTokenSchema), adminController.refreshAdminToken);
 
 // Owner routes
 router.post('/owners/register', validate(registerOwnerSchema), authController.registerOwner.bind(authController));
