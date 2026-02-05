@@ -37,3 +37,25 @@ export const authenticate = (
   }
 };
 
+export const requireOwner = (
+  req: AuthenticatedRequest,
+  _res: Response,
+  next: NextFunction
+) => {
+  if (req.user?.role !== 'OWNER' && req.user?.role !== 'SYSTEM_ADMIN') {
+    throw new AppError('Owner or Admin access required', 403, 'FORBIDDEN');
+  }
+  next();
+};
+
+export const requireSystemAdmin = (
+  req: AuthenticatedRequest,
+  _res: Response,
+  next: NextFunction
+) => {
+  if (req.user?.role !== 'SYSTEM_ADMIN') {
+    throw new AppError('System Admin access required', 403, 'FORBIDDEN');
+  }
+  next();
+};
+

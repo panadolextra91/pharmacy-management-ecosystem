@@ -105,6 +105,20 @@
 - **Customer Login**: Enabled **OTP Login** flow (`otp` field in DTO + Service logic) alongside password login.
 - **Inventory Schema**: Updated Swagger `InventoryItem` to return "Rich Data" (Units, Batches, Category) matching Code reality.
 
+### 9. Pharma Rep Catalog Upload (OTP-based) 🧪
+**Status**: ☑️ DONE
+
+Đã triển khai hệ thống upload danh mục thuốc an toàn cho Trình dược viên (Pharma Rep).
+
+**What was done**:
+- **OTP Authentication**: Reps authenticate via a 6-digit code sent to email (`/catalog/request-otp`). No account creation needed for uploads.
+- **CSV Injection Protection**: Implemented `csv-sanitizer.ts` to neutralize dangerous characters (`=`, `+`, `-`, `@`) in CSV uploads.
+- **Approval Workflow**: Uploaded items are saved with `status = PENDING`. Only Owners/Admins can see and approve them.
+- **Notification**: Tự động thông báo cho `MANAGER`/`OWNER` khi có danh mục mới cần duyệt.
+- **Data Normalization**: Tự động chuẩn hóa tên Category và Brand (Trim & Uppercase) để tránh trùng lặp.
+
+---
+
 ## Schema Changes Applied
 
 | Table | Column | Type | Purpose |
@@ -114,3 +128,5 @@
 | `inventory_batches` | `is_deleted` | Boolean (default: false) | Soft delete |
 | `owners` | `status` | Enum (PENDING/ACTIVE/SUSPENDED) | SaaS approval workflow |
 | `owners` | `subscription_expiry` | DateTime (nullable) | Subscription tracking |
+| `pharma_sales_reps`| `last_otp`, `otp_expires_at`, `is_verified` | String, DateTime, Boolean | OTP-based authentication |
+| `global_medicine_catalog` | `status` | Enum (PENDING/APPROVED/REJECTED) | Catalog approval workflow |

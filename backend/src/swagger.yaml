@@ -778,26 +778,121 @@ paths:
         '201':
           description: Medicine created
 
+  /catalog/request-otp:
+    post:
+      tags: [Catalog]
+      summary: Request OTP for Pharma Sales Rep
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  example: rep@supplier.com
+      responses:
+        '200':
+          description: OTP sent to email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
   /catalog/upload:
     post:
       tags: [Catalog]
-      summary: Bulk upload CSV
+      summary: Bulk upload CSV (OTP Verified)
+      security: []
+      description: |
+        Upload a CSV catalog for approval. Requires a valid OTP sent to the rep's email.
+        Security: Max 2MB, .csv only, CSV Injection Sanitization applied.
       requestBody:
         content:
           multipart/form-data:
             schema:
               type: object
+              required: [file, email, otp, supplierId]
               properties:
                 file:
                   type: string
                   format: binary
+                email:
+                  type: string
+                otp:
+                  type: string
                 supplierId:
                   type: string
-                pharmaRepId:
-                  type: string
+      responses:
+        '201':
+          description: Catalog uploaded and pending approval
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      successCount:
+                        type: integer
+                      errorCount:
+                        type: integer
+                      errors:
+                        type: array
+                        items:
+                          type: object
+
+  /catalog/pending:
+    get:
+      tags: [Catalog]
+      summary: List pending medicines (Owner only)
       responses:
         '200':
-          description: Import result
+          description: Pending medicine list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/CatalogItem'
+
+  /catalog/approve:
+    patch:
+      tags: [Catalog]
+      summary: Approve catalog items (Owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+                  example: ["uuid-1", "uuid-2"]
+      responses:
+        '200':
+          description: Items approved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
 
   # ==================== NOTIFICATIONS ====================
   /notifications:
@@ -1414,6 +1509,40 @@ components:
           type: string
         supplierId:
           type: string
+
+    CatalogItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        manufacturer:
+          type: string
+        activeIngredient:
+          type: string
+        barcode:
+          type: string
+        unitPrice:
+          type: number
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+        category:
+          type: object
+          properties:
+            name:
+              type: string
+        brand:
+          type: object
+          properties:
+            name:
+              type: string
+        supplier:
+          type: object
+          properties:
+            name:
+              type: string
 
     # ===== REMINDERS =====
     CreateReminderDto:

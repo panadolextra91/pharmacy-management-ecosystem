@@ -105,6 +105,7 @@ model GlobalMedicineCatalog {
   createdAt        DateTime            @default(now()) @map("created_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
   unitPrice        Decimal?            @map("unit_price") @db.Decimal(10, 2)
+  status           CatalogStatus       @default(PENDING)
   brand            Brand?              @relation(fields: [brandId], references: [id])
   category         Category?           @relation(fields: [categoryId], references: [id])
   pharmaRep        PharmaSalesRep      @relation(fields: [pharmaRepId], references: [id])
@@ -124,6 +125,9 @@ model PharmaSalesRep {
   phone        String
   supplierId   String                  @map("supplier_id")
   isActive     Boolean                 @default(true) @map("is_active")
+  lastOtp      String?                 @map("last_otp")
+  otpExpiresAt DateTime?               @map("otp_expires_at")
+  isVerified   Boolean                 @default(false) @map("is_verified")
   createdAt    DateTime                @default(now()) @map("created_at")
   updatedAt    DateTime                @updatedAt @map("updated_at")
   catalogItems GlobalMedicineCatalog[]
@@ -743,6 +747,12 @@ enum PurchaseStatus {
   PENDING
   CONFIRMED
   CANCELLED
+}
+
+enum CatalogStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model SystemAdmin {

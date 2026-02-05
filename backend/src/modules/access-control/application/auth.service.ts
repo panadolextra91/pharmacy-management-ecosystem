@@ -12,6 +12,7 @@ import {
 import { generateAccessToken, generateRefreshToken } from '../../../shared/utils/jwt';
 import { generateOtp, getOtpExpiration } from '../../../shared/utils/otp';
 import { IAuthRepository } from '../ports/auth.repository.port';
+import { sendEmail } from '../../../shared/config/email';
 
 // Assuming LoginCustomerDto is defined in '../application/dtos'
 // The user's instruction implies a change to the DTO definition itself,
@@ -298,6 +299,44 @@ export class AuthService {
             name: customer.fullName || undefined,
             role: 'CUSTOMER',
         });
+    }
+
+    // Pharma Sales Rep OTP
+    async requestPharmaRepOtp(email: string): Promise<void> {
+        const rep = await this.repository.findPharmaRepByEmail(email);
+        if (!rep) {
+            throw new AppError('Pharma Sales Rep not found', 404, 'NOT_FOUND');
+        }
+
+        const otp = generateOtp();
+        const expiresAt = getOtpExpiration(); // Default 10 minutes
+
+        await this.repository.updatePharmaRepOtp(email, otp, expiresAt);
+
+        await sendEmail({
+            to: email,
+            subject: 'Your Catalog Upload OTP Code',
+            html: `
+                <div style="font-family: sans-serif; padding: 20px;">
+                    <h2>Catalog Upload Authentication</h2>
+                    <p>Hello ${rep.name},</p>
+                    <p>Your OTP code for catalog upload is:</p>
+                    <div style="font-size: 24px; font-weight: bold; padding: 10px; background: #f4f4f4; display: inline-block;">
+                        ${otp}
+                    </div>
+                    <p>This code will expire in 10 minutes.</p>
+                </div>
+            `
+        });
+    }
+
+    async verifyPharmaRepToken(email: string, otp: string): Promise<string> {
+        const rep = await this.repository.verifyPharmaRepOtp(email, otp);
+        if (!rep) {
+            throw new AppError('Invalid or expired OTP', 400, 'INVALID_OTP');
+        }
+
+        return rep.id;
     }
 
     async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {

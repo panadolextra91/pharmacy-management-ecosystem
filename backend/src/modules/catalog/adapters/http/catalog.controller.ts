@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import catalogService from '../../application/catalog.service';
+import authService from '../../../access-control/application/auth.service';
 import { CreateGlobalMedicineDto, UpdateGlobalMedicineDto, GlobalMedicineQueryDto } from '../../application/dtos';
+import { AppError } from '../../../../shared/middleware/error-handler.middleware';
 
 class CatalogController {
     async create(req: Request, res: Response, next: NextFunction) {
@@ -69,35 +71,79 @@ class CatalogController {
         }
     }
 
+    async requestCatalogOtp(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { email } = req.body;
+            if (!email) throw new AppError('Email is required', 400, 'BAD_REQUEST');
+
+            await authService.requestPharmaRepOtp(email);
+
+            res.status(200).json({
+                success: true,
+                message: 'OTP sent to your email'
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async uploadCatalog(req: Request, res: Response, next: NextFunction) {
         try {
-            if (!req.file) {
-                throw new Error('No file uploaded');
+            const { email, otp, supplierId } = req.body;
+            if (!email || !otp || !supplierId) {
+                throw new AppError('email, otp, and supplierId are required', 400, 'BAD_REQUEST');
             }
 
-            const { supplierId, pharmaRepId } = req.body;
-            if (!supplierId || !pharmaRepId) {
-                throw new Error('supplierId and pharmaRepId are required');
+            if (!req.file) {
+                throw new AppError('No CSV file uploaded', 400, 'BAD_REQUEST');
             }
+
+            // Verify OTP and get Rep ID
+            const pharmaRepId = await authService.verifyPharmaRepToken(email, otp);
 
             const result = await catalogService.processCatalogCsv(req.file.buffer, supplierId, pharmaRepId);
 
             res.status(201).json({
                 success: true,
-                message: 'Catalog uploaded successfully',
+                message: 'Catalog uploaded and pending approval',
                 data: result
             });
         } catch (error) {
             next(error);
         }
     }
+
+    async getPendingItems(_req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await catalogService.getPendingItems();
+            res.json({
+                success: true,
+                data: result
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    async approveCatalogItems(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { ids } = req.body;
+            const result = await catalogService.approveCatalogItems(ids);
+            res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async sendPurchaseRequest(req: Request, res: Response, next: NextFunction) {
         try {
             const { items } = req.body;
-            // Pharmacy ID from auth user (tenant isolation)
             const pharmacyId = (req as any).pharmacyId || (req as any).user?.pharmacyId;
 
-            if (!pharmacyId) throw new Error('Pharmacy ID not found in context');
+            if (!pharmacyId) throw new AppError('Pharmacy ID not found', 403, 'FORBIDDEN');
 
             const result = await catalogService.sendPurchaseRequest({ pharmacyId, items });
 

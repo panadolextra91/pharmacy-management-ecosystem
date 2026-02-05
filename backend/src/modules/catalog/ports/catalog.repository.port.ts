@@ -18,4 +18,10 @@ export interface ICatalogRepository {
     findPharmacyById(id: string): Promise<any>;
     findManyByIds(ids: string[]): Promise<CatalogItemEntity[]>;
     createPurchaseInvoice(data: any): Promise<{ id: string }>;
+
+    // Catalog Approval Flow
+    upsertCategory(name: string): Promise<string>;
+    upsertBrand(name: string): Promise<string>;
+    findPendingItems(): Promise<CatalogItemEntity[]>;
+    approveItems(ids: string[]): Promise<void>;
 }

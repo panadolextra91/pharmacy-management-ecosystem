@@ -45,7 +45,10 @@
 | POST | `/` | Create new medicine in global catalog | Yes |
 | PATCH | `/:id` | Update medicine details | Yes |
 | DELETE | `/:id` | Delete medicine | Yes |
-| POST | `/upload` | Bulk upload CSV catalog (Requires `file`, `supplierId`, `pharmaRepId`) | Yes |
+| POST | `/request-otp` | Request OTP for Pharma Rep (Body: `{ email }`) | **No** (Public) |
+| POST | `/upload` | Bulk upload CSV catalog (**OTP Verified**. Body: `file`, `email`, `otp`, `supplierId`) | **No** (Public) |
+| GET | `/pending` | List pending medicines for approval | Yes (**Owner/Admin**) |
+| PATCH | `/approve` | Approve catalog items (Body: `{ ids: [] }`) | Yes (**Owner/Admin**) |
 | POST | `/purchase-request` | Send email purchase request to Pharma Reps (Body: `{ items: [{ catalogItemId, quantity }] }`) | Yes |
 
 ## Sales (`/api/sales`)

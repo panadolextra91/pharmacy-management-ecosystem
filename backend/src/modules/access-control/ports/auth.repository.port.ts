@@ -34,4 +34,9 @@ export interface IAuthRepository {
 
     // General
     findPermittedPharmacies(ownerId: string): Promise<{ id: string; name: string }[]>;
+
+    // Pharma Sales Rep
+    findPharmaRepByEmail(email: string): Promise<any | null>;
+    updatePharmaRepOtp(email: string, otp: string, expiresAt: Date): Promise<void>;
+    verifyPharmaRepOtp(email: string, otp: string): Promise<any | null>;
 }

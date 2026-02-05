@@ -120,4 +120,38 @@ export class PrismaCatalogRepository implements ICatalogRepository {
     async createPurchaseInvoice(data: any): Promise<{ id: string }> {
         return prisma.purchaseInvoice.create({ data });
     }
+
+    // Catalog Approval Flow
+    async upsertCategory(name: string): Promise<string> {
+        const category = await prisma.category.upsert({
+            where: { name },
+            update: {},
+            create: { name }
+        });
+        return category.id;
+    }
+
+    async upsertBrand(name: string): Promise<string> {
+        const brand = await prisma.brand.upsert({
+            where: { name },
+            update: {},
+            create: { name }
+        });
+        return brand.id;
+    }
+
+    async findPendingItems(): Promise<CatalogItemEntity[]> {
+        return prisma.globalMedicineCatalog.findMany({
+            where: { status: 'PENDING' },
+            include: { category: true, brand: true, supplier: true, pharmaRep: true },
+            orderBy: { createdAt: 'desc' }
+        }) as unknown as CatalogItemEntity[];
+    }
+
+    async approveItems(ids: string[]): Promise<void> {
+        await prisma.globalMedicineCatalog.updateMany({
+            where: { id: { in: ids } },
+            data: { status: 'APPROVED' }
+        });
+    }
 }
