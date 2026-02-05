@@ -71,6 +71,17 @@ Cấu hình qua Environment Variables:
 | `src/modules/access-control/application/owner-management.service.ts` | **NEW** - Service quản lý Owner |
 | `src/modules/access-control/adapters/http/owner-management.controller.ts` | **NEW** - Controller Admin APIs |
 | `src/modules/access-control/adapters/http/routes.ts` | Added Admin Owner Management routes |
+| `src/workers/inventory-reconciliation.worker.ts` | **NEW** - Self-healing inventory sync (hourly) |
+| `src/modules/analytics/adapters/http/analytics.controller.ts` | Updated with Redis caching (30s TTL) |
+
+---
+
+## ✅ Đã Triển Khai Thêm
+
+| Feature | Status |
+|---------|--------|
+| Inventory Reconciliation Worker | ☑️ DONE - Self-healing mỗi 1 tiếng |
+| Analytics Dashboard Caching | ☑️ DONE - Redis với TTL 30 giây |
 
 ---
 

@@ -61,27 +61,27 @@
 
 ---
 
-## 🔄 Pending Improvements
+## 🔄 Recently Completed
 
-### 5. Inventory Synchronization (Reconciliation)
-**Status**: ⏳ TO DO
+### 5. Inventory Reconciliation (Self-Healing) 🔧
+**Status**: ☑️ DONE
 
-**Problem**: Risk of `totalStockLevel` diverging from `SUM(batch.quantity)` due to race conditions.
-
-**Solution**: 
-- Add a nightly Cron Job (`reconcileInventory`) to recalculate and fix any discrepancies.
-- Consider using database triggers as an alternative.
+**What was done**:
+- Created `inventory-reconciliation.worker.ts` - runs every 1 hour.
+- Compares `totalStockLevel` with `SUM(batch.stockQuantity)`.
+- Auto-fixes any discrepancies and logs: `[FIXED] Inventory ID ... Mismatch corrected`.
+- Prevents data drift from race conditions.
 
 ---
 
-### 6. Analytics Performance
-**Status**: ⏳ TO DO
+### 6. Analytics Caching (Redis) ⚡
+**Status**: ☑️ DONE
 
-**Problem**: Real-time Dashboard queries are expensive.
-
-**Solutions**:
-- **Caching**: Cache Dashboard results for 5-10 minutes.
-- **Materialized Data**: Create `DailySalesSummary` table; populate via end-of-day worker.
+**What was done**:
+- Implemented Redis caching for Dashboard API (`GET /analytics/dashboard`).
+- Cache key: `dashboard:${pharmacyId}`.
+- **TTL: 30 seconds** (optimized for demo).
+- Response includes `cached: true/false` and `ttl` for transparency.
 
 ---
 

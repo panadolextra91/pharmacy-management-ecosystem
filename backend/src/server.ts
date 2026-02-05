@@ -76,6 +76,7 @@ app.use(errorHandler);
 import { runScheduler } from './workers/scheduler.worker';
 import { runMissedCheck } from './workers/missed-check.worker';
 import { runSystemAlerts } from './workers/system-alerts.worker';
+import { runInventoryReconciliation } from './workers/inventory-reconciliation.worker';
 
 const PORT = env.PORT || 3000;
 
@@ -98,6 +99,9 @@ app.listen(PORT, async () => {
       runSystemAlerts();
       setInterval(runSystemAlerts, 24 * 60 * 60 * 1000);
     }, 60 * 1000);
+
+    // 4. Inventory Reconciliation (Hourly - Self-Healing)
+    setInterval(runInventoryReconciliation, 60 * 60 * 1000);
 
     logger.info('Workers started.');
   }
