@@ -12,7 +12,7 @@ export class StaffService {
         const staff = await this.repository.findStaffById(staffId, pharmacyId);
         if (!staff) throw new AppError('Staff not found', 404, 'NOT_FOUND');
 
-        return this.repository.updateStaff(staffId, {
+        return this.repository.updateStaff(staffId, pharmacyId, {
             name: data.name,
             role: data.role,
             isActive: data.isActive
@@ -23,7 +23,7 @@ export class StaffService {
         const staff = await this.repository.findStaffById(staffId, pharmacyId);
         if (!staff) throw new AppError('Staff not found', 404, 'NOT_FOUND');
 
-        await this.repository.deleteStaff(staffId);
+        await this.repository.deleteStaff(staffId, pharmacyId);
         return { message: 'Staff deleted successfully' };
     }
 }

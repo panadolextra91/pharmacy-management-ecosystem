@@ -535,7 +535,7 @@ paths:
     post:
       tags: [Sales]
       summary: Create new order
-      description: Creates order, deducts stock (FIFO), captures cost price
+      description: Creates order with **Atomic Stock Deduction** (Safe against Race Conditions), FIFO cost capture.
       parameters:
         - $ref: '#/components/parameters/PharmacyIdHeader'
       requestBody:
@@ -1048,6 +1048,14 @@ components:
         Pharmacy ID for multi-tenant context.
         Required for Owner accounts with multiple pharmacies.
         Staff accounts auto-detect from their assigned pharmacy.
+
+    PharmacyIdPath:
+      name: pharmacyId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Target Pharmacy ID
 
   schemas:
     # ===== AUTH =====

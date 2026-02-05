@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import ownerManagementService from '../../application/owner-management.service';
-import { OwnerStatus } from '@prisma/client';
+import { OwnerStatus, ActorType, AuditAction } from '@prisma/client';
+import auditService from '../../../../shared/services/audit.service';
 
 /**
  * Owner Management Controller - System Admin Only (God Mode)
@@ -47,6 +48,19 @@ class OwnerManagementController {
             const expiryDate = subscriptionExpiry ? new Date(subscriptionExpiry) : undefined;
             const owner = await ownerManagementService.approveOwner(id, expiryDate);
 
+            // LOG: System Admin Approved Owner
+            await auditService.log({
+                req,
+                pharmacyId: undefined, // Global Action
+                actorId: (req as any).user?.id || 'SYSTEM_ADMIN',
+                actorType: ActorType.SYSTEM_ADMIN,
+                action: AuditAction.APPROVE,
+                resource: 'OWNER_ACCOUNT',
+                resourceId: owner.id,
+                newData: { status: OwnerStatus.ACTIVE, subscriptionExpiry },
+                metadata: { email: owner.email }
+            });
+
             res.json({
                 success: true,
                 message: `Owner ${owner.email} has been approved`,
@@ -67,6 +81,19 @@ class OwnerManagementController {
 
             const owner = await ownerManagementService.suspendOwner(id, reason);
 
+            // LOG: System Admin Suspended Owner
+            await auditService.log({
+                req,
+                pharmacyId: undefined, // Global Action
+                actorId: (req as any).user?.id || 'SYSTEM_ADMIN',
+                actorType: ActorType.SYSTEM_ADMIN,
+                action: AuditAction.SUSPEND,
+                resource: 'OWNER_ACCOUNT',
+                resourceId: owner.id,
+                newData: { status: OwnerStatus.SUSPENDED },
+                metadata: { reason, email: owner.email }
+            });
+
             res.json({
                 success: true,
                 message: `Owner ${owner.email} has been suspended`,
@@ -84,6 +111,19 @@ class OwnerManagementController {
         try {
             const { id } = req.params;
             const owner = await ownerManagementService.reactivateOwner(id);
+
+            // LOG: System Admin Reactivated Owner
+            await auditService.log({
+                req,
+                pharmacyId: undefined, // Global Action
+                actorId: (req as any).user?.id || 'SYSTEM_ADMIN',
+                actorType: ActorType.SYSTEM_ADMIN,
+                action: AuditAction.REACTIVATE,
+                resource: 'OWNER_ACCOUNT',
+                resourceId: owner.id,
+                newData: { status: OwnerStatus.ACTIVE },
+                metadata: { email: owner.email }
+            });
 
             res.json({
                 success: true,

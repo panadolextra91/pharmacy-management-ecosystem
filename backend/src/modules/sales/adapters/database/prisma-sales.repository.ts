@@ -31,8 +31,9 @@ export class PrismaSalesRepository implements ISalesRepository {
         }) as unknown as PharmacyInvoiceEntity;
     }
 
-    async findOrderById(id: string): Promise<PharmacyOrderEntity | null> {
-        return prisma.pharmacyOrder.findUnique({
+    async findOrderById(id: string, pharmacyId: string): Promise<PharmacyOrderEntity | null> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        return tenantPrisma.pharmacyOrder.findFirst({
             where: { id },
             include: { items: true }
         }) as unknown as PharmacyOrderEntity;

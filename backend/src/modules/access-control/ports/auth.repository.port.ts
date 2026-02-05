@@ -29,8 +29,8 @@ export interface IAuthRepository {
     // Staff Management
     findAllStaff(pharmacyId: string): Promise<StaffEntity[]>;
     findStaffById(id: string, pharmacyId: string): Promise<StaffEntity | null>;
-    updateStaff(id: string, data: any): Promise<StaffEntity>;
-    deleteStaff(id: string): Promise<void>;
+    updateStaff(id: string, pharmacyId: string, data: any): Promise<StaffEntity>;
+    deleteStaff(id: string, pharmacyId: string): Promise<void>;
 
     // General
     findPermittedPharmacies(ownerId: string): Promise<{ id: string; name: string }[]>;
@@ -39,4 +39,10 @@ export interface IAuthRepository {
     findPharmaRepByEmail(email: string): Promise<any | null>;
     updatePharmaRepOtp(email: string, otp: string, expiresAt: Date): Promise<void>;
     verifyPharmaRepOtp(email: string, otp: string): Promise<any | null>;
+
+    // Refresh Token
+    saveRefreshToken(data: { token: string; expiresAt: Date; userId: string; role: string }): Promise<void>;
+    findRefreshToken(token: string): Promise<any | null>;
+    revokeRefreshToken(token: string, replacedBy?: string): Promise<void>;
+    revokeAllUserTokens(userId: string, role: string): Promise<void>;
 }

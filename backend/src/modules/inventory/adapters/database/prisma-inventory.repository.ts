@@ -93,8 +93,9 @@ export class PrismaInventoryRepository implements IInventoryRepository {
         return inventory as unknown as InventoryEntity;
     }
 
-    async update(id: string, _pharmacyId: string, data: UpdateInventoryDto): Promise<InventoryEntity> {
-        const inventory = await prisma.pharmacyInventory.update({
+    async update(id: string, pharmacyId: string, data: UpdateInventoryDto): Promise<InventoryEntity> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        const inventory = await tenantPrisma.pharmacyInventory.update({
             where: { id },
             data,
             include: { units: true },
@@ -102,21 +103,49 @@ export class PrismaInventoryRepository implements IInventoryRepository {
         return inventory as unknown as InventoryEntity;
     }
 
-    async delete(id: string, _pharmacyId: string): Promise<void> {
+    async delete(id: string, pharmacyId: string): Promise<void> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
         // Soft delete instead of hard delete
-        await prisma.pharmacyInventory.update({
+        await tenantPrisma.pharmacyInventory.update({
             where: { id },
+            data: { isDeleted: true }
+        });
+        // Soft delete associated batches
+        await tenantPrisma.inventoryBatch.updateMany({
+            where: { inventoryId: id },
             data: { isDeleted: true }
         });
     }
 
     async deductStock(inventoryId: string, _pharmacyId: string, quantity: number, tx?: any): Promise<InventoryEntity> {
         const execute = async (client: any) => {
+            // 1. ATOMIC GUARD: Decrement Total Stock first to reserve quantity
+            // This prevents Race Conditions. If 2 requests try to sell last item, one will fail here.
+            // We use updateMany to avoid erroring if not found, allowing us to throw custom error.
+            const result = await client.pharmacyInventory.updateMany({
+                where: {
+                    id: inventoryId,
+                    totalStockLevel: { gte: quantity } // Constraint: Must have enough stock
+                },
+                data: {
+                    totalStockLevel: { decrement: quantity }
+                }
+            });
+
+            if (result.count === 0) {
+                // If count is 0, it means either ID is wrong OR (more likely) stock < quantity
+                // We double check to throw correct error
+                const current = await client.pharmacyInventory.findUnique({ where: { id: inventoryId } });
+                if (!current) throw new Error('Inventory verified but not found during update (Unreachable)');
+
+                throw new Error(`Insufficient stock for ${current.name}. Available: ${current.totalStockLevel}, Requested: ${quantity}`);
+            }
+
+            // 2. FIFO BATCH DEDUCTION
             let remainingToDeduct = quantity;
 
-            // FIFO Logic
             const batches = await client.inventoryBatch.findMany({
-                where: { inventoryId, stockQuantity: { gt: 0 } },
+                where: { inventoryId, stockQuantity: { gt: 0 }, isDeleted: false },
                 orderBy: { expiryDate: 'asc' }
             });
 
@@ -131,14 +160,15 @@ export class PrismaInventoryRepository implements IInventoryRepository {
                 remainingToDeduct -= deductAmount;
             }
 
-            const updatedInventory = await client.pharmacyInventory.update({
-                where: { id: inventoryId },
-                data: { totalStockLevel: { decrement: quantity } }
-            });
+            // 3. Cleanup: If we deducted from Total but somehow Batches didn't sum up (Data drift)
+            // The Inventory Reconciliation Worker will fix it later. 
+            // But we prioritize Total Stock accuracy for Sales.
 
-            if (updatedInventory.totalStockLevel <= updatedInventory.minStockLevel) {
-                // Log or trigger event
-            }
+            // Return updated header
+            const updatedInventory = await client.pharmacyInventory.findUnique({
+                where: { id: inventoryId },
+                include: { units: true } // Return with units as expected
+            });
 
             return updatedInventory as unknown as InventoryEntity;
         };

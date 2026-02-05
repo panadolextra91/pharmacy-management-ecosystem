@@ -35,6 +35,5 @@ export class AnalyticsService {
 // Export a factory/singleton for easy import, but standard requires explicit composition.
 // We will export class and let controller instantiate or export singleton at end.
 import { PrismaAnalyticsRepository } from '../adapters/database/prisma-analytics.repository';
-import prisma from '../../../shared/config/database'; // Adjust path if needed
-const analyticsRepository = new PrismaAnalyticsRepository(prisma);
+const analyticsRepository = new PrismaAnalyticsRepository();
 export default new AnalyticsService(analyticsRepository);

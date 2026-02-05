@@ -135,7 +135,8 @@ export class SalesService {
                     await this.inventoryService.deductStock(
                         item.inventoryId,
                         pharmacyId,
-                        item.baseQuantity
+                        item.baseQuantity,
+                        tx // Pass transaction to ensure atomicity
                     );
                 }
             }
@@ -143,19 +144,22 @@ export class SalesService {
             return order;
         });
 
-        // 6. Trigger Notification (Fire & Forget)
+        // 6. Trigger Notification (Async Queue)
         if (!isPosSale) {
             const message = `New order #${result.orderNumber} received ($${result.totalAmount})`;
 
-            import('../../notifications/application/staff-notification.service').then(service => {
-                service.default.notifyPharmacy(
-                    pharmacyId,
-                    'ORDER_NEW',
-                    'New Order Received',
-                    message,
-                    { orderId: result.id, orderNumber: result.orderNumber }
-                );
-            }).catch(console.error);
+            // Lazy load queue to avoid circular dependency issues during startup if any
+            import('../../notifications/queue/notification.queue').then(({ notificationQueue }) => {
+                import('../../../shared/queue/producer').then(({ safeAddJob }) => {
+                    safeAddJob(notificationQueue, 'ORDER_NEW', {
+                        pharmacyId,
+                        type: 'ORDER_NEW',
+                        title: 'New Order Received',
+                        message,
+                        data: { orderId: result.id, orderNumber: result.orderNumber }
+                    });
+                });
+            });
         }
 
         return result;

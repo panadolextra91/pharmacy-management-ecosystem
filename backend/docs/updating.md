@@ -65,6 +65,33 @@ Hệ thống được xây dựng trên stack: **Node.js (Express) + TypeScript 
 - **Customer Login**: Hỗ trợ **OTP Login** (Phone + Code) + Password Login.
 - **Inventory Data**: API trả về Rich Data (Units, Batches) thay vì chỉ thông tin cơ bản.
 
+### ✅ Operational Audit & Secure Export (Tier 3) 🛡️
+- **Audit Logging**: Ghi log toàn bộ hành động quan trọng (Login, Admin Approval, Stock Adjustment).
+- **Secure Export API**:
+  - System Admin: Export Customer Global DB.
+  - Owner: Export Inventory & Sales của từng nhà thuốc.
+  - Định dạng CSV, có ghi log người tải để truy vết.
+
+### ✅ Auth Security: Refresh Token Rotation (Tier 4) 🔐
+- **Reuse Detection**: Phát hiện hacker dùng lại token cũ -> Khóa ngay lập tức.
+- **Token Rotation**: Cấp mới Refresh Token liên tục giúp giảm thiểu rủi ro bị trộm token.
+- **Cleanup Worker**: Dọn dẹp DB tự động, xóa token rác.
+
+### ✅ Logic Stability: Atomic Stock Deduction (Tier 5) 🔒
+- **Race Condition Fixed**: Sửa lỗi tranh chấp kho khi nhiều người cùng bán.
+- **Atomic Decrement**: Kho luôn chính xác 100%, không bao giờ bị âm "ảo".
+
+### ✅ Scale & Concurrency (Tier 6) [NEW] 🚀
+- **BullMQ Integration**: Hệ thống xử lý tác vụ nền (Background Jobs) bằng Redis Queue.
+- **Async Processing**: Gửi thông báo đơn hàng (Notifications) không làm chậm API tạo đơn.
+- **Fail-Fast Resilience**: Cơ chế tự bảo vệ khi Redis sập (Không làm chết app).
+- **Admin Dashboard**: Giao diện quản lý Queue trực quan.
+
+### ⚠️ Accepted Tech Debt (Deferred)
+- Quyết định **không sửa** Distributed Lock cho Worker Reconciliation (chưa cần thiết).
+- Chấp nhận sai lệch millisecond ở Decimal Precision.
+- Chấp nhận Admin Ghost Mode (do Admin = Owner).
+
 ---
 
 ## 2. Các Module Đã Hoàn Thiện (Implemented Modules)

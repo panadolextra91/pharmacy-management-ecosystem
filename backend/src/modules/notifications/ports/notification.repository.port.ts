@@ -12,9 +12,9 @@ export interface INotificationRepository {
 
     // Staff Notifications
     findTargetStaff(pharmacyId: string, roles?: string[]): Promise<{ id: string }[]>;
-    createManyStaffNotifications(data: any[]): Promise<void>;
-    markStaffNotificationAsRead(id: string, staffId: string): Promise<void>;
-    markAllStaffNotificationsAsRead(staffId: string): Promise<void>;
-    getUnreadStaffNotificationCount(staffId: string): Promise<number>;
-    findStaffNotifications(staffId: string, query: any): Promise<{ data: StaffNotificationEntity[]; total: number }>;
+    createManyStaffNotifications(pharmacyId: string, data: any[]): Promise<void>;
+    markStaffNotificationAsRead(id: string, staffId: string, pharmacyId: string): Promise<void>;
+    markAllStaffNotificationsAsRead(staffId: string, pharmacyId: string): Promise<void>;
+    getUnreadStaffNotificationCount(staffId: string, pharmacyId: string): Promise<number>;
+    findStaffNotifications(staffId: string, pharmacyId: string, query: any): Promise<{ data: StaffNotificationEntity[]; total: number }>;
 }

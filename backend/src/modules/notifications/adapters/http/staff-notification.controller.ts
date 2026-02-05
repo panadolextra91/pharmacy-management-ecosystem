@@ -18,7 +18,10 @@ class StaffNotificationController {
         const limit = Number(req.query.limit) || 20;
         const isRead = req.query.isRead === 'true' ? true : req.query.isRead === 'false' ? false : undefined;
 
-        const result = await staffNotificationService.getNotifications(staffId, page, limit, isRead);
+        const pharmacyId = authReq.pharmacyId || authReq.user?.pharmacyId;
+        if (!pharmacyId) throw new AppError('Pharmacy ID is required', 400);
+
+        const result = await staffNotificationService.getNotifications(staffId, pharmacyId, page, limit, isRead);
         res.json(result);
     }
 
@@ -29,7 +32,10 @@ class StaffNotificationController {
 
         if (!staffId) throw new AppError('Unauthorized', 401);
 
-        await staffNotificationService.markAsRead(id, staffId);
+        const pharmacyId = authReq.pharmacyId || authReq.user?.pharmacyId;
+        if (!pharmacyId) throw new AppError('Pharmacy ID is required', 400);
+
+        await staffNotificationService.markAsRead(id, staffId, pharmacyId);
         res.json({ success: true, message: 'Notification marked as read' });
     }
 
@@ -39,7 +45,10 @@ class StaffNotificationController {
 
         if (!staffId) throw new AppError('Unauthorized', 401);
 
-        await staffNotificationService.markAllAsRead(staffId);
+        const pharmacyId = authReq.pharmacyId || authReq.user?.pharmacyId;
+        if (!pharmacyId) throw new AppError('Pharmacy ID is required', 400);
+
+        await staffNotificationService.markAllAsRead(staffId, pharmacyId);
         res.json({ success: true, message: 'All notifications marked as read' });
     }
 
@@ -49,7 +58,10 @@ class StaffNotificationController {
 
         if (!staffId) throw new AppError('Unauthorized', 401);
 
-        const count = await staffNotificationService.getUnreadCount(staffId);
+        const pharmacyId = authReq.pharmacyId || authReq.user?.pharmacyId;
+        if (!pharmacyId) throw new AppError('Pharmacy ID is required', 400);
+
+        const count = await staffNotificationService.getUnreadCount(staffId, pharmacyId);
         res.json({ count });
     }
 }

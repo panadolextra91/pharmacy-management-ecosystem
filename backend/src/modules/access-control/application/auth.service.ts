@@ -341,19 +341,74 @@ export class AuthService {
 
     async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
         const { verifyRefreshToken } = await import('../../../shared/utils/jwt');
+        let payload: any;
         try {
-            const payload = verifyRefreshToken(refreshToken);
-            const newAccessToken = generateAccessToken(payload);
-            const newRefreshToken = generateRefreshToken(payload);
-            return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+            payload = verifyRefreshToken(refreshToken);
         } catch (error) {
             throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
         }
+
+        const storedToken = await this.repository.findRefreshToken(refreshToken);
+
+        // 1. REUSE DETECTION
+        if (storedToken && storedToken.revokedAt) {
+            console.error(`[SECURITY] Reuse of revoked token detected! Token: ${refreshToken}`);
+
+            // Revoke ALL tokens for this user
+            const userId = storedToken.ownerId || storedToken.staffId || storedToken.customerId || storedToken.adminId;
+            const role = storedToken.ownerId ? 'OWNER' : storedToken.staffId ? 'STAFF' : storedToken.customerId ? 'CUSTOMER' : 'SYSTEM_ADMIN';
+
+            await this.repository.revokeAllUserTokens(userId, role);
+
+            throw new AppError('Security breach detected. Please log in again.', 403, 'SECURITY_BREACH_LOGOUT');
+        }
+
+        // 2. TOKEN NOT FOUND OR MISMATCH
+        if (!storedToken) {
+            throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
+        }
+
+        // 3. ROTATION
+        // Revoke current token
+        const newPayload = { ...payload };
+        delete newPayload.iat;
+        delete newPayload.exp;
+
+        const newAccessToken = generateAccessToken(newPayload);
+        const newRefreshToken = generateRefreshToken(newPayload);
+
+        await this.repository.revokeRefreshToken(refreshToken, newRefreshToken); // Lineage
+
+        // Save new token
+        const userId = storedToken.ownerId || storedToken.staffId || storedToken.customerId || storedToken.adminId;
+        const role = storedToken.ownerId ? 'OWNER' : storedToken.staffId ? 'STAFF' : storedToken.customerId ? 'CUSTOMER' : 'SYSTEM_ADMIN';
+
+        await this.repository.saveRefreshToken({
+            token: newRefreshToken,
+            userId,
+            role,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        });
+
+        return { accessToken: newAccessToken, refreshToken: newRefreshToken };
     }
 
-    private generateAuthResponse(tokenPayload: TokenPayload, userData: any): AuthResponse {
+    async logout(refreshToken: string): Promise<void> {
+        await this.repository.revokeRefreshToken(refreshToken);
+    }
+
+    private async generateAuthResponse(tokenPayload: TokenPayload, userData: any): Promise<AuthResponse> {
         const accessToken = generateAccessToken(tokenPayload);
         const refreshToken = generateRefreshToken(tokenPayload);
+
+        // Save refresh token to DB
+        await this.repository.saveRefreshToken({
+            token: refreshToken,
+            userId: tokenPayload.id,
+            role: tokenPayload.role,
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+        });
+
         return {
             success: true,
             data: {

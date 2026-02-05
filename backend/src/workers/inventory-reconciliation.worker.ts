@@ -11,6 +11,9 @@ import logger from '../shared/utils/logger';
  * This prevents data drift caused by race conditions or bugs.
  */
 
+import auditService from '../shared/services/audit.service';
+import { ActorType, AuditAction } from '@prisma/client';
+
 interface ReconciliationResult {
     inventoryId: string;
     pharmacyId: string;
@@ -82,6 +85,18 @@ export async function runInventoryReconciliation(): Promise<void> {
                     `Mismatch corrected: ${currentTotal} → ${actualTotal} ` +
                     `(diff: ${result.difference > 0 ? '+' : ''}${result.difference})`
                 );
+                // Log to Audit System
+                await auditService.log({
+                    pharmacyId: inventory.pharmacyId,
+                    actorId: 'SYSTEM_WORKER',
+                    actorType: ActorType.SYSTEM_ADMIN,
+                    action: AuditAction.UPDATE,
+                    resource: 'INVENTORY_RECONCILIATION',
+                    resourceId: inventory.id,
+                    oldData: { totalStockLevel: currentTotal },
+                    newData: { totalStockLevel: actualTotal },
+                    metadata: { difference: result.difference, reason: 'Batch mismatch' }
+                });
             }
         }
 

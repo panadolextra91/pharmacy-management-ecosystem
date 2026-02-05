@@ -24,6 +24,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@bull-board/api": "^6.16.4",
+    "@bull-board/express": "^6.16.4",
     "@googlemaps/google-maps-services-js": "^3.3.36",
     "@prisma/client": "^5.7.0",
     "bcrypt": "^5.1.1",

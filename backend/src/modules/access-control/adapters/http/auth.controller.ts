@@ -12,6 +12,8 @@ import {
   SendOtpDto,
   RefreshTokenDto,
 } from '../../application/dtos';
+import auditService from '../../../../shared/services/audit.service';
+import { ActorType, AuditAction } from '@prisma/client';
 
 export class AuthController {
   // Owner endpoints
@@ -29,6 +31,18 @@ export class AuthController {
     try {
       const data: LoginOwnerDto = req.body;
       const result = await authService.loginOwner(data);
+      const user = result.data.user as any;
+
+      await auditService.log({
+        req,
+        pharmacyId: user.pharmacyId,
+        actorId: user.id,
+        actorType: ActorType.OWNER,
+        action: AuditAction.LOGIN,
+        resource: 'AUTH',
+        metadata: { email: data.email }
+      });
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -63,6 +77,18 @@ export class AuthController {
     try {
       const data: LoginStaffDto = req.body;
       const result = await authService.loginStaff(data);
+      const user = result.data.user as any;
+
+      await auditService.log({
+        req,
+        pharmacyId: user.pharmacyId,
+        actorId: user.id,
+        actorType: ActorType.STAFF,
+        action: AuditAction.LOGIN,
+        resource: 'AUTH',
+        metadata: { email: data.email }
+      });
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -120,6 +146,31 @@ export class AuthController {
         success: true,
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async logout(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { refreshToken } = req.body;
+      if (refreshToken) {
+        await authService.logout(refreshToken);
+      }
+
+      const user = (req as any).user;
+      if (user) {
+        await auditService.log({
+          req,
+          pharmacyId: user.pharmacyId,
+          actorId: user.id || 'UNKNOWN',
+          actorType: user.role === 'OWNER' ? ActorType.OWNER : user.role === 'STAFF' ? ActorType.STAFF : ActorType.SYSTEM_ADMIN,
+          action: AuditAction.LOGOUT,
+          resource: 'AUTH',
+        });
+      }
+
+      res.json({ success: true, message: 'Logged out successfully' });
     } catch (error) {
       next(error);
     }

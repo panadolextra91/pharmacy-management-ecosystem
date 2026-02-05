@@ -2,6 +2,8 @@ import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../../../../shared/types/express';
 import inventoryService from '../../application/inventory.service';
 import { CreateInventoryDto, UpdateInventoryDto, InventoryQueryDto } from '../../application/dtos';
+import auditService from '../../../../shared/services/audit.service';
+import { ActorType, AuditAction } from '@prisma/client';
 
 class InventoryController {
     async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -77,12 +79,24 @@ class InventoryController {
             if (quantity > 0) {
                 throw new Error('Use POST /items/:id/stock to add positive stock with batch details');
             } else {
+
                 const result = await inventoryService.deductStock(id, req.pharmacyId!, Math.abs(quantity));
 
-                // Check low stock alert "side effect" - ideally via Domain Event, for now simplified check here or inside service.
-                // Service has the check logic? In refactor I removed the explicit import to notification service to decouple.
-                // If we strictly follow clean arch, we return the result, and maybe emit an event.
-                // For now, let's keep it simple.
+                // LOG: Manual Stock Adjustment (Potential Theft/Loss)
+                await auditService.log({
+                    req,
+                    pharmacyId: req.pharmacyId!,
+                    actorId: (req as any).user?.id,
+                    actorType: ActorType.STAFF, // Assuming mostly staff does this
+                    action: AuditAction.UPDATE,
+                    resource: 'INVENTORY_STOCK',
+                    resourceId: id,
+                    metadata: {
+                        adjustment: quantity,
+                        reason: 'Manual Adjustment',
+                        isNegative: true
+                    }
+                });
 
                 res.json({ success: true, data: result });
             }
