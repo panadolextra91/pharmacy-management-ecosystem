@@ -30,6 +30,7 @@ model Owner {
   createdAt           DateTime    @default(now()) @map("created_at")
   updatedAt           DateTime    @updatedAt @map("updated_at")
   pharmacies          Pharmacy[]
+  refreshTokens       RefreshToken[]
 
   @@map("owners")
 }
@@ -58,6 +59,7 @@ model Pharmacy {
   purchaseInvoices   PurchaseInvoice[]
   staffNotifications StaffNotification[]
   storageLocations   StorageLocation[]
+  auditLogs          AuditLog[]
 
   @@index([latitude, longitude])
   @@index([ownerId])
@@ -86,7 +88,9 @@ model Customer {
   invoices           PharmacyInvoice[]
   orders             PharmacyOrder[]
   reminderLogs       ReminderLog[]
+  refreshTokens      RefreshToken[]
 
+  @@index([phone])
   @@map("customers")
 }
 
@@ -239,6 +243,7 @@ model PharmacyStaff {
   deliveries     Delivery[]
   pharmacy       Pharmacy            @relation(fields: [pharmacyId], references: [id])
   notifications  StaffNotification[]
+  refreshTokens  RefreshToken[]
 
   @@index([pharmacyId])
   @@index([email])
@@ -310,6 +315,7 @@ model InventoryBatch {
   updatedAt     DateTime          @updatedAt @map("updated_at")
   inventory     PharmacyInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
 
+  @@index([inventoryId, isDeleted, stockQuantity, expiryDate])
   @@index([inventoryId, expiryDate])
   @@index([expiryDate])
   @@map("inventory_batches")
@@ -762,6 +768,90 @@ model SystemAdmin {
   name      String
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  refreshTokens RefreshToken[]
 
   @@map("system_admins")
+}
+
+enum ActorType {
+  SYSTEM_ADMIN
+  OWNER
+  STAFF
+  SALES_REP
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  IMPORT
+  APPROVE
+  REJECT
+  SUSPEND
+  REACTIVATE
+}
+
+enum AuditStatus {
+  SUCCESS
+  FAILURE
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  pharmacyId  String?     @map("pharmacy_id")
+  actorId     String      @map("actor_id")
+  actorType   ActorType   @map("actor_type")
+  action      AuditAction
+  resource    String
+  resourceId  String?     @map("resource_id")
+  oldData     Json?       @map("old_data")
+  newData     Json?       @map("new_data")
+  ipAddress   String?     @map("ip_address")
+  userAgent   String?     @map("user_agent")
+  status      AuditStatus @default(SUCCESS)
+  metadata    Json?
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  // Optional relation to pharmacy for easier cleanup/multitenancy
+  pharmacy    Pharmacy?   @relation(fields: [pharmacyId], references: [id])
+
+  @@index([pharmacyId])
+  @@index([actorId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model RefreshToken {
+  id          String      @id @default(cuid())
+  token       String      @unique
+  expiresAt   DateTime    @map("expires_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  revokedAt   DateTime?   @map("revoked_at")
+  replacedBy  String?     @map("replaced_by")
+
+  // Polymorphic-ish relations
+  // We can't use a single "userId" easily with Prisma foreign keys unless we loosen the FK constraint or use a separate User table.
+  // Given we have separate tables for Owner, etc., we'll link individually.
+  owner       Owner?       @relation(fields: [ownerId], references: [id])
+  ownerId     String?      @map("owner_id")
+
+  staff       PharmacyStaff? @relation(fields: [staffId], references: [id])
+  staffId     String?      @map("staff_id")
+
+  customer    Customer?    @relation(fields: [customerId], references: [id])
+  customerId  String?      @map("customer_id")
+
+  admin       SystemAdmin? @relation(fields: [adminId], references: [id])
+  adminId     String?      @map("admin_id")
+
+  @@index([token])
+  @@index([ownerId])
+  @@index([staffId])
+  @@index([customerId])
+  @@index([adminId])
+  @@map("refresh_tokens")
 }

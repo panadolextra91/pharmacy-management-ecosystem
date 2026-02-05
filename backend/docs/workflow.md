@@ -39,6 +39,13 @@ This document outlines the core workflows of the Pharmacy Management System, det
 4.  **System** returns tokens and user profile.
 5.  **Front-End** stores tokens securely (HTTP-only cookies or SecureStore).
 
+### Refresh Token Flow (Rotation)
+1.  **Actor** requests new Access Token (`POST /auth/refresh`).
+2.  **System** verifies Refresh Token.
+    *   **If Valid**: Revokes old token, issues NEW Access + NEW Refresh Token.
+    *   **If Revoked (Reuse Attempt)**: **SECURITY BREACH!** System revokes ALL tokens for that user and forces logout (Error: `SECURITY_BREACH_LOGOUT`).
+3.  **Front-End** replaces old tokens with new ones.
+
 ### Tenant Isolation (Middleware)
 1.  **Actor** makes a request to a protected route (e.g., `/api/inventory`).
 2.  **Middleware** determines `pharmacyId`:
@@ -89,6 +96,18 @@ This document outlines the core workflows of the Pharmacy Management System, det
 
 ---
 
+## 3.5. Secure Data Export Workflow 📤
+**Actors**: System Admin, Owner
+
+1.  **Actor** requests data export (e.g., `GET /admin/export/customers`).
+2.  **System** verifies permissions (System Admin or Owner of Pharmacy).
+3.  **System** queries database for requested data (Customers, Sales, Inventory).
+4.  **System** generates CSV string in-memory.
+5.  **System** creates **Audit Log** (`Action: EXPORT`, `Resource: DATA_CSV`).
+6.  **System** streams CSV file to client as attachment.
+
+---
+
 ## 4.- **Sales & Point of Sale (POS)**: Core transaction flow, Receipt generation.
 - **Analytics & Reporting**: Dashboard stats, Charts, Advanced Reports (P&L, Top Selling).
 - **Customer Management (CRM)**: Identify customers, Track health info, View purchase history.
@@ -109,14 +128,15 @@ This document outlines the core workflows of the Pharmacy Management System, det
 4.  **Staff** confirms Order.
 5.  **System** creates `PharmacyOrder` (Status: `CONFIRMED` or `PENDING`).
 
-#### B. Stock Deduction (Automatic)
-*Triggered on Order Confirmation*
-1.  **System** converts Order Quantity to Base Unit.
-2.  **System** retrieves `InventoryBatches` for the item, sorted by Expiry Date (Ascending).
-3.  **System** iterates through batches:
-    *   Deduct from Batch 1. If exhausted, move to Batch 2.
-    *   Mark batches as `Empty` if quantity reaches 0.
-4.  **System** updates `PharmacyInventory.totalStock`.
+#### B. Stock Deduction (Atomic)
+*Triggered on Order Confirmation to prevent Race Conditions*
+1.  **System** starts Database Transaction.
+2.  **System** executes **Atomic Guard**:
+    *   `UPDATE PharmacyInventory SET totalStock = totalStock - qty WHERE id = :id AND totalStock >= qty`
+    *   **If Row Count == 0**: Throw `INSUFFICIENT_STOCK` (Security: Prevents concurrent overselling).
+3.  **System** retrieves `InventoryBatches` (FIFO).
+4.  **System** iterates through batches and deducts quantity using the same valid transaction.
+5.  **System** commits transaction.
 
 #### C. Invoice Generation
 *Triggered on Order Payment/Delivery*
@@ -178,14 +198,14 @@ This document outlines the core workflows of the Pharmacy Management System, det
 ### A. Scheduling Workflow
 1.  **Customer** creates a reminder (e.g., "Panadol, Daily at 8:00 AM").
 2.  **System** saves `MedicineReminder` config.
-3.  **Worker (Scheduler)** runs every minute:
+3.  **Worker (Scheduler)** runs every minute (Legacy Interval) OR **BullMQ Repeatable Job**:
     *   Finds reminders due now.
     *   Checks if a notification is already scheduled for today.
     *   Creates a `ReminderNotification` (Status: `PENDING`).
     *   Adds job to `NotificationQueue` (BulMQ).
 
 ### B. Notification Delivery
-1.  **Worker (Notification)** picks up job from Queue.
+1.  **Worker (Notification)** picks up job from Queue (BullMQ - Scalable).
 2.  **System** sends Push Notification (Expo) to Customer's device.
 3.  **System** updates `ReminderNotification` status to `SENT`.
 

@@ -13,8 +13,8 @@
 | POST | `/login/staff` | Login as Staff | No |
 | POST | `/register/customer` | Register new Customer | No |
 | POST | `/login/customer` | Login as Customer | No |
-| POST | `/refresh-token` | Refresh Access Token | No |
-| POST | `/logout` | Logout (Invalidate Refresh Token) | No |
+| POST | `/refresh` | Refresh Access Token (Rotation & Reuse Detection) | No |
+| POST | `/logout` | Logout (Revokes Refresh Token) | No |
 | POST | `/verify-otp` | Verify OTP (for registration/login) | No |
 | POST | `/admin/register` | Register System Admin (First setup) | No |
 | POST | `/admin/login` | Login as System Admin | No |
@@ -33,6 +33,8 @@
 | PUT | `/admin/owners/:id/approve` | Approve pending Owner. Body: `{ subscriptionExpiry?: Date }` | Yes (Admin) |
 | PUT | `/admin/owners/:id/suspend` | Suspend Owner. Body: `{ reason?: string }` | Yes (Admin) |
 | PUT | `/admin/owners/:id/reactivate` | Reactivate suspended Owner | Yes (Admin) |
+| GET | `/admin/export/customers` | **Export Global Customers (CSV)**. Audit Logged. | Yes (Admin) |
+| GET | `/admin/queues` | **Job Queue Dashboard**. Bull Board UI to monitor Background Tasks (Notifications/Cron). | Yes (Admin - UI) |
 
 
 ## Global Medicine Catalog (`/api/catalog`)
@@ -54,7 +56,7 @@
 ## Sales (`/api/sales`)
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
-| POST | `/orders` | Create new Order. Supports POS (Walk-in) via `isPosSale: true`. Triggers Stock Deduction & Invoice. | Yes |
+| POST | `/orders` | Create new Order. Supports POS. **Atomic Stock Check** (Prevents Overselling). | Yes |
 | GET | `/invoices/:id/receipt` | Get structured receipt data (JSON) for printing/PDF generation. | Yes |
 
 ## Inventory Management (`/api/inventory`)
@@ -96,6 +98,7 @@
 | `POST` | `/:id/stock` | Add stock (Batch In) | `x-pharmacy-id` (Owner) |
 | `GET` | `/alerts/expiry` | Get expiring items | `x-pharmacy-id` (Owner) |
 | `GET` | `/alerts/stock` | Get low stock items | `x-pharmacy-id` (Owner) |
+| `GET` | `/export/inventory/:pharmacyId` | **Export Inventory (CSV)**. Audit Logged. | **Auth Token** (Owner/Admin) |
 
 ---
 
@@ -136,6 +139,7 @@
 | `GET` | `/revenue-chart` | Chart Data (Last 7 days) | No |
 | `GET` | `/profit-loss` | P&L Report | No |
 | `GET` | `/top-selling` | Top Products | No |
+| `GET` | `/export/sales/:pharmacyId` | **Export Sales (CSV)**. Audit Logged. | **Auth Token** (Owner/Admin) |
 
 > **Headers**: All Analytics endpoints accept `x-pharmacy-id` for Owner context.
 

@@ -1,4 +1,5 @@
 import prisma from '../../../../shared/config/database';
+import { createTenantPrisma } from '../../../../shared/prisma/client';
 import { INotificationRepository } from '../../ports/notification.repository.port';
 import { ReminderNotificationEntity, StaffNotificationEntity } from '../../domain/entities';
 // Note: StaffNotificationType and StaffRole types available from @prisma/client if needed
@@ -63,46 +64,49 @@ export class PrismaNotificationRepository implements INotificationRepository {
 
     // Staff Notifications
     async findTargetStaff(pharmacyId: string, roles?: string[]): Promise<{ id: string }[]> {
-        const whereClause: any = {
-            pharmacyId,
-            isActive: true
-        };
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        const whereClause: any = { isActive: true };
         if (roles && roles.length > 0) {
             whereClause.role = { in: roles };
         }
-        return prisma.pharmacyStaff.findMany({
+        return tenantPrisma.pharmacyStaff.findMany({
             where: whereClause,
             select: { id: true }
         });
     }
 
-    async createManyStaffNotifications(data: any[]): Promise<void> {
-        await prisma.staffNotification.createMany({ data });
+    async createManyStaffNotifications(pharmacyId: string, data: any[]): Promise<void> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        await tenantPrisma.staffNotification.createMany({ data });
     }
 
-    async markStaffNotificationAsRead(id: string, staffId: string): Promise<void> {
-        await prisma.staffNotification.updateMany({
+    async markStaffNotificationAsRead(id: string, staffId: string, pharmacyId: string): Promise<void> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        await tenantPrisma.staffNotification.updateMany({
             where: { id, staffId },
             data: { isRead: true }
         });
     }
 
-    async markAllStaffNotificationsAsRead(staffId: string): Promise<void> {
-        await prisma.staffNotification.updateMany({
+    async markAllStaffNotificationsAsRead(staffId: string, pharmacyId: string): Promise<void> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        await tenantPrisma.staffNotification.updateMany({
             where: { staffId, isRead: false },
             data: { isRead: true }
         });
     }
 
-    async getUnreadStaffNotificationCount(staffId: string): Promise<number> {
-        return prisma.staffNotification.count({
+    async getUnreadStaffNotificationCount(staffId: string, pharmacyId: string): Promise<number> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        return tenantPrisma.staffNotification.count({
             where: { staffId, isRead: false }
         });
     }
 
-    async findStaffNotifications(staffId: string, query: any): Promise<{ data: StaffNotificationEntity[]; total: number }> {
+    async findStaffNotifications(staffId: string, pharmacyId: string, query: any): Promise<{ data: StaffNotificationEntity[]; total: number }> {
         const { page = 1, limit = 20, isRead } = query;
         const skip = (page - 1) * limit;
+        const tenantPrisma = createTenantPrisma(pharmacyId);
         const where: any = { staffId };
 
         if (isRead !== undefined) {
@@ -110,13 +114,13 @@ export class PrismaNotificationRepository implements INotificationRepository {
         }
 
         const [notifications, total] = await Promise.all([
-            prisma.staffNotification.findMany({
+            tenantPrisma.staffNotification.findMany({
                 where,
                 skip,
                 take: limit,
                 orderBy: { createdAt: 'desc' }
             }),
-            prisma.staffNotification.count({ where })
+            tenantPrisma.staffNotification.count({ where })
         ]);
 
         return { data: notifications as unknown as StaffNotificationEntity[], total };

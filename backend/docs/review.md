@@ -82,6 +82,16 @@
 - Cache key: `dashboard:${pharmacyId}`.
 - **TTL: 30 seconds** (optimized for demo).
 - Response includes `cached: true/false` and `ttl` for transparency.
+- **Resilience**: Added `safeAddJob` wrapper to handle Redis outages gracefully (Fire-and-forget without crashing).
+
+---
+
+## 14. Known Limitations & Tech Debt (Deferred)
+Các vấn đề sau đã được nhận diện nhưng quyết định **Skip** (Chưa sửa ngay) vì không ảnh hưởng nghiêm trọng ở quy mô hiện tại:
+
+1.  **Distributed Lock**: Worker Inventory Reconciliation chưa có lock, có thể conflict nếu chạy đúng lúc bán hàng. (Chấp nhận vì xác suất thấp).
+2.  **Decimal Precision**: Có thể lệch 1-2 đồng do làm tròn. (Chấp nhận được).
+3.  **System Admin Ghost Mode**: Admin có thể xem data mà không log đặc biệt. (Chấp nhận vì Admin là Owner).
 
 ---
 
@@ -116,6 +126,35 @@
 - **Approval Workflow**: Uploaded items are saved with `status = PENDING`. Only Owners/Admins can see and approve them.
 - **Notification**: Tự động thông báo cho `MANAGER`/`OWNER` khi có danh mục mới cần duyệt.
 - **Data Normalization**: Tự động chuẩn hóa tên Category và Brand (Trim & Uppercase) để tránh trùng lặp.
+
+### 10. Operational Audit Logging & Secure Export (Tier 3) 🛡️
+**Status**: ☑️ DONE
+
+**What was done**:
+- **Audit System**:
+  - Implement `AuditLog` in Prisma (Action, Actor, Resource, Old/New Data).
+  - Integrated `AuditService` to log critical actions: Login, Admin Actions, Stock Adjustments.
+- **Secure Data Export**:
+  - Allows System Admin to export Global Customers (CSV).
+  - Allows Owners to export Inventory & Sales per Pharmacy (CSV).
+  - **Strict Logging**: Every export action is logged with `Actor`, `IP`, and `Resource` to prevent data leakage.
+
+### 11. Auth Security: Refresh Token Rotation (Tier 4) 🔐
+**Status**: ☑️ DONE
+
+**What was done**:
+- **Rotation Logic**: Mỗi lần refresh token được sử dụng, server sẽ thu hồi token cũ và cấp token mới.
+- **Reuse Detection**: Nếu token cũ (đã bị thu hồi) bị sử dụng lại (bởi hacker), hệ thống sẽ phát hiện và **đá văng** tất cả phiên đăng nhập của user đó.
+- **Cleanup Worker**: Cron job chạy hàng ngày để xóa token hết hạn hoặc token đã bị thu hồi quá 30 ngày.
+- **Logout API**: Endpoint `/auth/logout` để user chủ động thu hồi token.
+
+### 12. Logic Stability: Atomic Stock Deduction (Tier 5) 🔒
+**Status**: ☑️ DONE
+
+**What was done**:
+- **Atomic Guard**: Trước khi trừ lô (batches), hệ thống thực hiện trừ `totalStockLevel` bằng lệnh Atomic (`decrement`).
+- **Transaction Safe**: `SalesService` chuyển transaction (`tx`) xuống `InventoryRepository`.
+- **Result**: Không còn Race Condition. Nếu 2 người cùng mua sản phẩm cuối cùng, một người sẽ thành công, người kia sẽ nhận lỗi "Insufficient Stock" ngay lập tức, đảm bảo kho không bao giờ bị âm.
 
 ---
 

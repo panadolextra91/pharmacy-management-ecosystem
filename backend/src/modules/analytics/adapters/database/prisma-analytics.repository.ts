@@ -1,19 +1,19 @@
-import { PrismaClient } from '@prisma/client';
 import dayjs from 'dayjs';
+import { createTenantPrisma } from '../../../../shared/prisma/client';
 import { IAnalyticsRepository } from '../../ports/analytics.repository.port';
 import { DashboardStats, InventoryValuation, ProfitLossReport, RevenueChartPoint, TopSellingItem } from '../../domain/types';
 
 export class PrismaAnalyticsRepository implements IAnalyticsRepository {
-    constructor(private prisma: PrismaClient) { }
+    constructor() { }
 
     async getDashboardStats(pharmacyId: string): Promise<DashboardStats> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
         const startOfDay = dayjs().startOf('day').toDate();
         const endOfDay = dayjs().endOf('day').toDate();
 
         // 1. Today's Revenue & Orders
-        const todayOrders = await this.prisma.pharmacyOrder.aggregate({
+        const todayOrders = await tenantPrisma.pharmacyOrder.aggregate({
             where: {
-                pharmacyId,
                 createdAt: { gte: startOfDay, lte: endOfDay },
                 status: { not: 'CANCELLED' }
             },
@@ -22,26 +22,23 @@ export class PrismaAnalyticsRepository implements IAnalyticsRepository {
         });
 
         // 2. Low Stock Items Count
-        const lowStockCount = await this.prisma.pharmacyInventory.count({
+        const lowStockCount = await tenantPrisma.pharmacyInventory.count({
             where: {
-                pharmacyId,
                 isActive: true,
-                totalStockLevel: { lte: this.prisma.pharmacyInventory.fields.minStockLevel }
+                totalStockLevel: { lte: (tenantPrisma as any).pharmacyInventory.fields.minStockLevel }
             }
         });
 
         // 3. Total Customers
-        const totalCustomersGroup = await this.prisma.pharmacyOrder.groupBy({
+        const totalCustomersGroup = await tenantPrisma.pharmacyOrder.groupBy({
             by: ['customerId'],
-            where: { pharmacyId },
         });
 
         // 4. Low Stock Items List
-        const lowStockItems = await this.prisma.pharmacyInventory.findMany({
+        const lowStockItems = await tenantPrisma.pharmacyInventory.findMany({
             where: {
-                pharmacyId,
                 isActive: true,
-                totalStockLevel: { lte: this.prisma.pharmacyInventory.fields.minStockLevel }
+                totalStockLevel: { lte: (tenantPrisma as any).pharmacyInventory.fields.minStockLevel }
             },
             take: 5,
             select: { id: true, name: true, totalStockLevel: true, minStockLevel: true }
@@ -49,9 +46,9 @@ export class PrismaAnalyticsRepository implements IAnalyticsRepository {
 
         // 5. Expiring Batches
         const warningDate = dayjs().add(30, 'day').toDate();
-        const expiringBatches = await this.prisma.inventoryBatch.findMany({
+        const expiringBatches = await tenantPrisma.inventoryBatch.findMany({
             where: {
-                inventory: { pharmacyId },
+                inventory: { pharmacyId }, // Note: inventoryBatch filter still manual if not extended
                 stockQuantity: { gt: 0 },
                 expiryDate: { lte: warningDate }
             },
@@ -78,10 +75,10 @@ export class PrismaAnalyticsRepository implements IAnalyticsRepository {
     }
 
     async getRevenueChart(pharmacyId: string, startDate: Date, endDate: Date): Promise<RevenueChartPoint[]> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
         // Fetch raw orders and aggregate in code (simplified matching existing logic)
-        const orders = await this.prisma.pharmacyOrder.findMany({
+        const orders = await tenantPrisma.pharmacyOrder.findMany({
             where: {
-                pharmacyId,
                 createdAt: { gte: startDate, lte: endDate },
                 status: { not: 'CANCELLED' }
             },
@@ -108,9 +105,9 @@ export class PrismaAnalyticsRepository implements IAnalyticsRepository {
     }
 
     async getProfitLoss(pharmacyId: string, startDate: Date, endDate: Date): Promise<ProfitLossReport> {
-        const orders = await this.prisma.pharmacyOrder.findMany({
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        const orders = await tenantPrisma.pharmacyOrder.findMany({
             where: {
-                pharmacyId,
                 status: { not: 'CANCELLED' },
                 createdAt: { gte: startDate, lte: endDate }
             },
@@ -165,11 +162,11 @@ export class PrismaAnalyticsRepository implements IAnalyticsRepository {
     }
 
     async getTopSelling(pharmacyId: string, limit: number): Promise<TopSellingItem[]> {
-        const topItems = await this.prisma.orderItem.groupBy({
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        const topItems = await tenantPrisma.orderItem.groupBy({
             by: ['inventoryId'],
             where: {
                 order: {
-                    pharmacyId,
                     status: { not: 'CANCELLED' }
                 }
             },
@@ -182,7 +179,7 @@ export class PrismaAnalyticsRepository implements IAnalyticsRepository {
 
         const results: TopSellingItem[] = [];
         for (const item of topItems) {
-            const inventory = await this.prisma.pharmacyInventory.findUnique({
+            const inventory = await tenantPrisma.pharmacyInventory.findFirst({
                 where: { id: item.inventoryId },
                 select: { name: true }
             });
@@ -197,7 +194,8 @@ export class PrismaAnalyticsRepository implements IAnalyticsRepository {
     }
 
     async getInventoryValuation(pharmacyId: string): Promise<InventoryValuation> {
-        const batches = await this.prisma.inventoryBatch.findMany({
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        const batches = await tenantPrisma.inventoryBatch.findMany({
             where: {
                 inventory: { pharmacyId },
                 stockQuantity: { gt: 0 }

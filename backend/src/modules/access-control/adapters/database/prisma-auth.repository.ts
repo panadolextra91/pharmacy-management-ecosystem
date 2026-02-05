@@ -108,16 +108,18 @@ export class PrismaAuthRepository implements IAuthRepository {
         }) as unknown as StaffEntity;
     }
 
-    async updateStaff(id: string, data: any): Promise<StaffEntity> {
-        return prisma.pharmacyStaff.update({
+    async updateStaff(id: string, pharmacyId: string, data: any): Promise<StaffEntity> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        return tenantPrisma.pharmacyStaff.update({
             where: { id },
             data,
             select: { id: true, name: true, role: true, isActive: true, pharmacyId: true, email: true, username: true, createdAt: true, updatedAt: true }
         }) as unknown as StaffEntity;
     }
 
-    async deleteStaff(id: string): Promise<void> {
-        await prisma.pharmacyStaff.update({
+    async deleteStaff(id: string, pharmacyId: string): Promise<void> {
+        const tenantPrisma = createTenantPrisma(pharmacyId);
+        await tenantPrisma.pharmacyStaff.update({
             where: { id },
             data: { isActive: false }
         });
@@ -153,6 +155,64 @@ export class PrismaAuthRepository implements IAuthRepository {
                 email,
                 lastOtp: otp,
                 otpExpiresAt: { gt: new Date() }
+            }
+        });
+    }
+
+    // Refresh Token
+    async saveRefreshToken(data: { token: string; expiresAt: Date; userId: string; role: string }): Promise<void> {
+        // Map role to specific relation
+        const relationData: any = {};
+        if (data.role === 'OWNER') relationData.ownerId = data.userId;
+        else if (data.role === 'STAFF' || data.role === 'PHARMACIST' || data.role === 'MANAGER') relationData.staffId = data.userId;
+        else if (data.role === 'CUSTOMER') relationData.customerId = data.userId;
+        else if (data.role === 'SYSTEM_ADMIN') relationData.adminId = data.userId;
+
+        await prisma.refreshToken.create({
+            data: {
+                token: data.token,
+                expiresAt: data.expiresAt,
+                ...relationData
+            }
+        });
+    }
+
+    async findRefreshToken(token: string): Promise<any | null> {
+        return prisma.refreshToken.findUnique({
+            where: { token },
+            include: {
+                owner: true,
+                staff: true,
+                customer: true,
+                admin: true
+            }
+        });
+    }
+
+    async revokeRefreshToken(token: string, replacedBy?: string): Promise<void> {
+        await prisma.refreshToken.update({
+            where: { token },
+            data: {
+                revokedAt: new Date(),
+                replacedBy
+            }
+        });
+    }
+
+    async revokeAllUserTokens(userId: string, role: string): Promise<void> {
+        const whereClause: any = {};
+        if (role === 'OWNER') whereClause.ownerId = userId;
+        else if (['STAFF', 'PHARMACIST', 'MANAGER'].includes(role)) whereClause.staffId = userId;
+        else if (role === 'CUSTOMER') whereClause.customerId = userId;
+        else if (role === 'SYSTEM_ADMIN') whereClause.adminId = userId;
+
+        await prisma.refreshToken.updateMany({
+            where: {
+                ...whereClause,
+                revokedAt: null // Only revoke currently valid tokens
+            },
+            data: {
+                revokedAt: new Date()
             }
         });
     }

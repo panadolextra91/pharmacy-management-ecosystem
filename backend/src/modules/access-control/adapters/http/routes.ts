@@ -3,6 +3,7 @@ import authController from './auth.controller';
 import * as adminAuthController from './admin-auth.controller';
 import staffController from './staff.controller';
 import ownerManagementController from './owner-management.controller';
+import dataExportController from '../../../system-admin/adapters/http/data-export.controller';
 import { validate } from '../../../../shared/middleware/validation.middleware';
 import { authenticate } from '../../../../shared/middleware/auth.middleware';
 import { requireOwner } from '../../../../shared/middleware/roles.middleware';
@@ -37,9 +38,22 @@ router.put('/admin/owners/:id/approve', authenticate, requireSystemAdmin, ownerM
 router.put('/admin/owners/:id/suspend', authenticate, requireSystemAdmin, ownerManagementController.suspendOwner.bind(ownerManagementController));
 router.put('/admin/owners/:id/reactivate', authenticate, requireSystemAdmin, ownerManagementController.reactivateOwner.bind(ownerManagementController));
 
+// System Admin - Data Export 📥
+router.get('/admin/export/customers', authenticate, requireSystemAdmin, dataExportController.exportCustomers.bind(dataExportController));
+
 // Owner routes
 router.post('/owners/register', validate(registerOwnerSchema), authController.registerOwner.bind(authController));
 router.post('/owners/login', validate(loginOwnerSchema), authController.loginOwner.bind(authController));
+
+// Owner - Data Export 📥
+// Note: We use requireOwner or requireSystemAdmin (handled inside controller for advanced logic or here via middleware chain if simple)
+// For simplicity and to allow Admin to export for tenants, we might need a unified middleware or just check in controller.
+// But as per request: "Owner... tải... phải chọn từng cái".
+// Let's protect it with `authenticate` and let controller/service validate access if pharmacyId is passed.
+// Or we can use `requirePharmacyAccess` if the pharmacyId is in params/query?
+// `requirePharmacyAccess` expects pharmacyId in body/query/params.
+router.get('/export/sales/:pharmacyId', authenticate, requirePharmacyAccess, dataExportController.exportSales.bind(dataExportController));
+router.get('/export/inventory/:pharmacyId', authenticate, requirePharmacyAccess, dataExportController.exportInventory.bind(dataExportController));
 
 // Staff routes (Only Owner can manage staff)
 router.post('/staff/register', authenticate, requirePharmacyAccess, requireOwner, validate(registerStaffSchema), authController.registerStaff.bind(authController));
@@ -58,5 +72,6 @@ router.post('/otp/verify', validate(verifyOtpSchema), authController.verifyOtp.b
 
 // Token routes
 router.post('/refresh', validate(refreshTokenSchema), authController.refreshToken.bind(authController));
+router.post('/logout', validate(refreshTokenSchema), authController.logout.bind(authController));
 
 export default router;

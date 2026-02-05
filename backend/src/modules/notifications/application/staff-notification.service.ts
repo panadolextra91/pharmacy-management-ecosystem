@@ -28,7 +28,7 @@ export class StaffNotificationService {
                 isRead: false
             }));
 
-            await this.repository.createManyStaffNotifications(notificationsData);
+            await this.repository.createManyStaffNotifications(pharmacyId, notificationsData);
 
             logger.info(`[StaffNotification] Sent '${type}' to ${staffMembers.length} staff in Pharmacy ${pharmacyId}`);
 
@@ -37,20 +37,20 @@ export class StaffNotificationService {
         }
     }
 
-    async markAsRead(notificationId: string, staffId: string) {
-        return await this.repository.markStaffNotificationAsRead(notificationId, staffId);
+    async markAsRead(notificationId: string, staffId: string, pharmacyId: string) {
+        return await this.repository.markStaffNotificationAsRead(notificationId, staffId, pharmacyId);
     }
 
-    async markAllAsRead(staffId: string) {
-        return await this.repository.markAllStaffNotificationsAsRead(staffId);
+    async markAllAsRead(staffId: string, pharmacyId: string) {
+        return await this.repository.markAllStaffNotificationsAsRead(staffId, pharmacyId);
     }
 
-    async getUnreadCount(staffId: string) {
-        return await this.repository.getUnreadStaffNotificationCount(staffId);
+    async getUnreadCount(staffId: string, pharmacyId: string) {
+        return await this.repository.getUnreadStaffNotificationCount(staffId, pharmacyId);
     }
 
-    async getNotifications(staffId: string, page = 1, limit = 20, isRead?: boolean) {
-        const result = await this.repository.findStaffNotifications(staffId, { page, limit, isRead });
+    async getNotifications(staffId: string, pharmacyId: string, page = 1, limit = 20, isRead?: boolean) {
+        const result = await this.repository.findStaffNotifications(staffId, pharmacyId, { page, limit, isRead });
 
         return {
             data: result.data.map(n => ({
