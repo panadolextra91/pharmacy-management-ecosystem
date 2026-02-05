@@ -37,6 +37,16 @@ Hệ thống được xây dựng trên stack: **Node.js (Express) + TypeScript 
   - `PUT /admin/owners/:id/suspend` - Đình chỉ Owner
 - **Script**: `npx ts-node prisma/seed-admin.ts` - Tạo Super Admin.
 
+### ✅ Inventory Reconciliation Worker 🔧
+- **Self-Healing Cronjob**: Chạy mỗi 1 tiếng.
+- Logic: `totalStockLevel = SUM(batch.stockQuantity)`.
+- Tự động fix nếu phát hiện sai lệch → Log `[FIXED]`.
+
+### ✅ Analytics Dashboard Caching ⚡
+- **Redis Cache**: Key `dashboard:${pharmacyId}`.
+- **TTL: 30 giây** (cho demo, production có thể tăng lên 5-10 phút).
+- Response thêm `cached: true/false` và `ttl` để debug.
+
 ---
 
 ## 2. Các Module Đã Hoàn Thiện (Implemented Modules)

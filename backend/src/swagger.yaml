@@ -617,8 +617,11 @@ paths:
   /analytics/dashboard:
     get:
       tags: [Analytics]
-      summary: Get dashboard stats
-      description: Today's revenue, orders, low stock, expiring items
+      summary: Get dashboard stats (Cached)
+      description: |
+        Dashboard data with Redis caching.
+        - **TTL**: 30 seconds
+        - Response includes `cached: true/false` and `ttl` for transparency
       responses:
         '200':
           description: Dashboard data
