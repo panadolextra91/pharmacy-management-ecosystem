@@ -1,7 +1,7 @@
 import * as jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
 import env from '../config/env';
-import { TokenPayload } from '../../modules/access-control/types';
+import { TokenPayload } from '../../modules/access-control/application/dtos';
 
 export type { TokenPayload };
 

@@ -1,6 +1,6 @@
 import { Worker } from 'bullmq';
 import { QUEUE_CONNECTION } from '../shared/config/queues';
-import notificationService from '../modules/notifications/services/notification.service';
+import notificationService from '../modules/notifications/application/reminder-notification.service';
 import logger from '../shared/utils/logger';
 
 export const notificationWorker = new Worker('notifications', async (job) => {

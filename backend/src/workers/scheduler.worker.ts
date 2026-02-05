@@ -1,5 +1,5 @@
 import prisma from '../shared/config/database';
-import notificationService from '../modules/notifications/services/notification.service';
+import notificationService from '../modules/notifications/application/reminder-notification.service';
 import logger from '../shared/utils/logger';
 
 /**

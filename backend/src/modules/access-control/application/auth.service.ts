@@ -1,0 +1,306 @@
+import * as bcrypt from 'bcrypt';
+import { AppError } from '../../../shared/middleware/error-handler.middleware';
+import {
+    RegisterOwnerDto,
+    LoginOwnerDto,
+    RegisterStaffDto,
+    LoginStaffDto,
+    RegisterCustomerDto,
+    LoginCustomerDto,
+    AuthResponse,
+    TokenPayload,
+} from '../application/dtos';
+import { generateAccessToken, generateRefreshToken } from '../../../shared/utils/jwt';
+import { generateOtp, getOtpExpiration } from '../../../shared/utils/otp';
+import { IAuthRepository } from '../ports/auth.repository.port';
+
+const SALT_ROUNDS = 10;
+
+export class AuthService {
+    constructor(private readonly repository: IAuthRepository) { }
+
+    // Owner Authentication
+    async registerOwner(data: RegisterOwnerDto): Promise<AuthResponse> {
+        const existingOwner = await this.repository.findOwnerByEmail(data.email);
+        if (existingOwner) {
+            throw new AppError('Owner with this email already exists', 409, 'EMAIL_EXISTS');
+        }
+
+        const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
+        const owner = await this.repository.createOwner({
+            email: data.email,
+            password: hashedPassword,
+            name: data.name,
+            phone: data.phone,
+        });
+
+        const tokenPayload: TokenPayload = {
+            id: owner.id,
+            email: owner.email,
+            role: 'OWNER',
+        };
+
+        return this.generateAuthResponse(tokenPayload, {
+            id: owner.id,
+            email: owner.email,
+            name: owner.name,
+            role: 'OWNER',
+        });
+    }
+
+    async loginOwner(data: LoginOwnerDto): Promise<AuthResponse> {
+        const owner = await this.repository.findOwnerByEmail(data.email);
+        if (!owner) {
+            throw new AppError('Invalid email or password', 401, 'AUTH_INVALID');
+        }
+        if (!owner.isActive) {
+            throw new AppError('Account is deactivated', 403, 'ACCOUNT_DEACTIVATED');
+        }
+
+        // Check Owner status (SaaS logic)
+        if ((owner as any).status === 'PENDING') {
+            throw new AppError(
+                'Your account is pending approval. Please wait for admin activation.',
+                403,
+                'ACCOUNT_PENDING'
+            );
+        }
+        if ((owner as any).status === 'SUSPENDED') {
+            throw new AppError(
+                'Your account has been suspended. Please contact support.',
+                403,
+                'ACCOUNT_SUSPENDED'
+            );
+        }
+
+        const isValidPassword = await bcrypt.compare(data.password, owner.password || '');
+        if (!isValidPassword) {
+            throw new AppError('Invalid email or password', 401, 'AUTH_INVALID');
+        }
+
+        const tokenPayload: TokenPayload = {
+            id: owner.id,
+            email: owner.email,
+            role: 'OWNER',
+        };
+
+        const pharmacies = await this.repository.findPermittedPharmacies(owner.id);
+
+        return this.generateAuthResponse(tokenPayload, {
+            id: owner.id,
+            email: owner.email,
+            name: owner.name,
+            role: 'OWNER',
+            pharmacies,
+        });
+    }
+
+    // Staff Authentication
+    async registerStaff(data: RegisterStaffDto, pharmacyId: string): Promise<AuthResponse> {
+        const pharmacy = await this.repository.findPharmacyById(pharmacyId);
+        if (!pharmacy) {
+            throw new AppError('Pharmacy not found', 404, 'NOT_FOUND');
+        }
+
+        const existingStaff = await this.repository.findStaffByEmail(data.email);
+        if (existingStaff) {
+            throw new AppError('Staff with this email already exists', 409, 'EMAIL_EXISTS');
+        }
+
+        const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
+        const staff = await this.repository.createStaff({
+            username: data.username,
+            password: hashedPassword,
+            name: data.name,
+            email: data.email,
+            role: data.role,
+            pharmacyId: pharmacyId,
+        });
+
+        const tokenPayload: TokenPayload = {
+            id: staff.id,
+            email: staff.email,
+            role: staff.role,
+            pharmacyId: staff.pharmacyId,
+        };
+
+        return this.generateAuthResponse(tokenPayload, {
+            id: staff.id,
+            email: staff.email,
+            name: staff.name,
+            role: staff.role,
+            pharmacyId: pharmacyId,
+        });
+    }
+
+    async loginStaff(data: LoginStaffDto): Promise<AuthResponse> {
+        const staff = await this.repository.findStaffByEmail(data.email);
+        if (!staff) {
+            throw new AppError('Invalid email or password', 401, 'AUTH_INVALID');
+        }
+        if (!staff.isActive) {
+            throw new AppError('Account is deactivated', 403, 'ACCOUNT_DEACTIVATED');
+        }
+        if (staff.pharmacy && !staff.pharmacy.isActive) {
+            throw new AppError('Pharmacy is deactivated', 403, 'PHARMACY_DEACTIVATED');
+        }
+
+        const isValidPassword = await bcrypt.compare(data.password, staff.password || '');
+        if (!isValidPassword) {
+            throw new AppError('Invalid email or password', 401, 'AUTH_INVALID');
+        }
+
+        const tokenPayload: TokenPayload = {
+            id: staff.id,
+            email: staff.email,
+            role: staff.role,
+            pharmacyId: staff.pharmacyId,
+        };
+
+        return this.generateAuthResponse(tokenPayload, {
+            id: staff.id,
+            email: staff.email,
+            name: staff.name,
+            role: staff.role,
+            pharmacyId: staff.pharmacyId,
+        });
+    }
+
+    // Customer Authentication
+    async registerCustomer(data: RegisterCustomerDto): Promise<AuthResponse> {
+        const existingCustomer = await this.repository.findCustomerByPhone(data.phone);
+        if (existingCustomer) {
+            throw new AppError('Customer with this phone number already exists', 409, 'PHONE_EXISTS');
+        }
+
+        const hashedPassword = data.password
+            ? await bcrypt.hash(data.password, SALT_ROUNDS)
+            : undefined;
+
+        const customer = await this.repository.createCustomer({
+            phone: data.phone,
+            password: hashedPassword,
+            fullName: data.fullName,
+            email: data.email || null,
+            registrationSource: data.registrationSource || 'mobile_app',
+            verified: false,
+        });
+
+        const tokenPayload: TokenPayload = {
+            id: customer.id,
+            phone: customer.phone,
+            role: 'CUSTOMER',
+        };
+
+        return this.generateAuthResponse(tokenPayload, {
+            id: customer.id,
+            phone: customer.phone,
+            name: customer.fullName || undefined,
+            role: 'CUSTOMER',
+        });
+    }
+
+    async loginCustomer(data: LoginCustomerDto): Promise<AuthResponse> {
+        const customer = await this.repository.findCustomerByPhone(data.phone);
+        if (!customer) {
+            throw new AppError('Customer not found', 404, 'NOT_FOUND');
+        }
+
+        if (data.password && customer.password) {
+            const isValidPassword = await bcrypt.compare(data.password, customer.password);
+            if (!isValidPassword) {
+                throw new AppError('Invalid password', 401, 'AUTH_INVALID');
+            }
+        } else if (data.password && !customer.password) {
+            throw new AppError('Password not set. Please use OTP login or set a password', 400, 'PASSWORD_NOT_SET');
+        }
+
+        const tokenPayload: TokenPayload = {
+            id: customer.id,
+            phone: customer.phone,
+            role: 'CUSTOMER',
+        };
+
+        return this.generateAuthResponse(tokenPayload, {
+            id: customer.id,
+            phone: customer.phone,
+            name: customer.fullName || undefined,
+            role: 'CUSTOMER',
+        });
+    }
+
+    // OTP
+    async sendOtp(phone: string): Promise<{ success: boolean; message: string }> {
+        const otp = generateOtp();
+        const expiresAt = getOtpExpiration();
+
+        await this.repository.deleteUnusedOtps(phone);
+        await this.repository.createOtp({ phone, otp, expiresAt });
+
+        console.log(`OTP for ${phone}: ${otp}`);
+
+        return { success: true, message: 'OTP sent successfully' };
+    }
+
+    async verifyOtp(phone: string, otp: string): Promise<AuthResponse> {
+        const otpRecord = await this.repository.findValidOtp(phone, otp);
+        if (!otpRecord) {
+            throw new AppError('Invalid or expired OTP', 400, 'INVALID_OTP');
+        }
+
+        await this.repository.markOtpUsed(otpRecord.id);
+
+        let customer = await this.repository.findCustomerByPhone(phone);
+        if (!customer) {
+            customer = await this.repository.createCustomer({
+                phone,
+                verified: true,
+                verifiedAt: new Date(),
+                registrationSource: 'mobile_app',
+            });
+        } else {
+            customer = await this.repository.updateCustomerVerified(customer.id);
+        }
+
+        const tokenPayload: TokenPayload = {
+            id: customer.id,
+            phone: customer.phone,
+            role: 'CUSTOMER',
+        };
+
+        return this.generateAuthResponse(tokenPayload, {
+            id: customer.id,
+            phone: customer.phone,
+            name: customer.fullName || undefined,
+            role: 'CUSTOMER',
+        });
+    }
+
+    async refreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> {
+        const { verifyRefreshToken } = await import('../../../shared/utils/jwt');
+        try {
+            const payload = verifyRefreshToken(refreshToken);
+            const newAccessToken = generateAccessToken(payload);
+            const newRefreshToken = generateRefreshToken(payload);
+            return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+        } catch (error) {
+            throw new AppError('Invalid refresh token', 401, 'INVALID_REFRESH_TOKEN');
+        }
+    }
+
+    private generateAuthResponse(tokenPayload: TokenPayload, userData: any): AuthResponse {
+        const accessToken = generateAccessToken(tokenPayload);
+        const refreshToken = generateRefreshToken(tokenPayload);
+        return {
+            success: true,
+            data: {
+                user: userData,
+                accessToken,
+                refreshToken
+            }
+        };
+    }
+}
+
+import { PrismaAuthRepository } from '../adapters/database/prisma-auth.repository';
+export default new AuthService(new PrismaAuthRepository());

@@ -23,6 +23,18 @@
 | PATCH | `/staff/:id` | Update staff details (Role, Status) | Yes |
 | DELETE | `/staff/:id` | Deactivate staff member | Yes |
 
+## System Admin - Owner Management (`/api/auth/admin`) 🔐
+*God Mode - Only System Admin can access these endpoints.*
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| GET | `/admin/owners` | List all Owners. Query: `status` (PENDING/ACTIVE/SUSPENDED) | Yes (Admin) |
+| GET | `/admin/owners/:id` | Get Owner details with pharmacies list | Yes (Admin) |
+| PUT | `/admin/owners/:id/approve` | Approve pending Owner. Body: `{ subscriptionExpiry?: Date }` | Yes (Admin) |
+| PUT | `/admin/owners/:id/suspend` | Suspend Owner. Body: `{ reason?: string }` | Yes (Admin) |
+| PUT | `/admin/owners/:id/reactivate` | Reactivate suspended Owner | Yes (Admin) |
+
+
 ## Global Medicine Catalog (`/api/catalog`)
 *Managed by Platform Admins & Pharma Reps. Shared across all pharmacies.*
 
