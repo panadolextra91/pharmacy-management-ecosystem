@@ -1,0 +1,90 @@
+@startuml
+left to right direction
+actor "System Administrator" as Admin
+actor "Pharmacy Owner" as Owner
+actor "Staff (Pharmacist/Cashier)" as Staff
+actor "Customer" as Customer
+actor "Pharma Sales Rep (External)" as Rep
+
+rectangle "Pharmacy Management System" {
+
+  ' System Admin Use Cases
+  usecase "Manage Tenants & Subscriptions" as UC_ManageTenants
+  usecase "Manage Global Medicine Catalog" as UC_GlobalCatalog
+
+  ' Owner Use Cases
+  usecase "Manage Branch Settings" as UC_BranchSettings
+  usecase "Manage Staff & Roles" as UC_ManageStaff
+  usecase "Financial Reporting (P&L)" as UC_Financials
+  usecase "Request Stock (Email Bridge)" as UC_RequestStock
+
+  ' Staff Use Cases
+  usecase "Process Sales (POS)" as UC_POS
+  usecase "Manage Customer Records" as UC_CustomerRecords
+  usecase "Inventory Batching" as UC_Inventory
+
+  ' Customer Use Cases
+  usecase "Order Medications" as UC_Order
+  usecase "Manage Health Records" as UC_Health
+  usecase "AI Consultation (Planned)" as UC_AI
+
+  ' Relationships
+  Admin --> UC_ManageTenants
+  Admin --> UC_GlobalCatalog
+
+  Owner --> UC_BranchSettings
+  Owner --> UC_ManageStaff
+  Owner --> UC_Financials
+  Owner --> UC_RequestStock
+  Owner --|> Staff : extends
+
+  Staff --> UC_POS
+  Staff --> UC_CustomerRecords
+  Staff --> UC_Inventory
+
+  Customer --> UC_Order
+  Customer --> UC_Health
+  Customer --> UC_AI
+
+  ' Rep interaction (Off-system)
+  UC_RequestStock ..> Rep : Email Notification
+}
+@enduml
+
+==================================================
+ACTORS & USE CASE DESCRIPTIONS
+==================================================
+
+1. ACTOR: SYSTEM ADMINISTRATOR
+   - **Role**: The "Super User" of the SaaS platform.
+   - **Responsibilities**:
+     - Manages pharmacy registrations (Tenants) and subscription statuses.
+     - Maintains the Global Medicine Catalog (Central Database).
+
+2. ACTOR: PHARMACY OWNER
+   - **Role**: The tenant owner who manages their specific pharmacy chain or store.
+   - **Responsibilities**:
+     - Has full control over their own pharmacy’s data.
+     - Manages staff accounts (Pharmacist/Cashier).
+     - Configures branch settings and views financial reports (Revenue, P&L).
+
+3. ACTOR: STAFF (Pharmacist/Cashier)
+   - **Role**: Employees assigned to a specific pharmacy branch.
+   - **Responsibilities**:
+     - Perform daily operations: Inventory batching (stock in).
+     - Process sales (POS) and handle cash/QR payments.
+     - Customer record management (CRM) within their assigned branch.
+
+4. ACTOR: CUSTOMER
+   - **Role**: The end-user using the Mobile Application.
+   - **Responsibilities**:
+     - Manages personal health records.
+     - Orders medications via the app.
+     - Uses AI consultation (Future Feature).
+
+5. ACTOR: PHARMA SALES REP (External)
+   - **Role**: External suppliers (Data Entity).
+   - **Note**: Currently interacts via "Email Bridge" rather than direct login.
+   - **Responsibilities**:
+     - Receives Purchase Requests from Owners via email.
+     - Provides catalog updates (processed by System Admin).

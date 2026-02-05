@@ -4,6 +4,7 @@ import { ICatalogRepository } from '../ports/catalog.repository.port';
 import { CreateGlobalMedicineDto, UpdateGlobalMedicineDto, GlobalMedicineQueryDto, SendPurchaseRequestDto } from '../application/dtos';
 import { AppError } from '../../../shared/middleware/error-handler.middleware';
 import { sendEmail } from '../../../shared/config/email';
+import { sanitizeCsvRow, normalizeName } from '../../../shared/utils/csv-sanitizer';
 
 export class CatalogService {
     constructor(private readonly repository: ICatalogRepository) { }
@@ -53,8 +54,6 @@ export class CatalogService {
 
     async processCatalogCsv(buffer: Buffer, supplierId: string, pharmaRepId: string) {
         const results: any[] = [];
-        // Using ES6 imports at top of file
-
         const stream = Readable.from(buffer.toString());
 
         return new Promise((resolve, reject) => {
@@ -66,13 +65,29 @@ export class CatalogService {
                         let successCount = 0;
                         const errors: any[] = [];
 
-                        for (const row of results) {
+                        for (const rawRow of results) {
+                            // Sanitization (Security: Excel Injection Protection)
+                            const row = sanitizeCsvRow(rawRow);
+
                             if (!row.name) {
                                 errors.push({ row, error: 'Missing name' });
                                 continue;
                             }
 
                             try {
+                                // Normalization & Mapping (Step 3: CSV Processing)
+                                let categoryId = undefined;
+                                if (row.category_name) {
+                                    const normCategory = normalizeName(row.category_name);
+                                    categoryId = await this.repository.upsertCategory(normCategory);
+                                }
+
+                                let brandId = undefined;
+                                if (row.brand_name) {
+                                    const normBrand = normalizeName(row.brand_name);
+                                    brandId = await this.repository.upsertBrand(normBrand);
+                                }
+
                                 const data = {
                                     name: row.name,
                                     manufacturer: row.manufacturer,
@@ -80,9 +95,12 @@ export class CatalogService {
                                     packaging: row.packaging,
                                     activeIngredient: row.activeIngredient,
                                     barcode: row.barcode,
-                                    unitPrice: row.unitPrice ? parseFloat(row.unitPrice) : undefined,
+                                    unitPrice: row.unitPrice ? parseFloat(row.unitPrice.toString().replace(/[^0-9.]/g, '')) : undefined,
                                     supplierId,
                                     pharmaRepId,
+                                    categoryId,
+                                    brandId,
+                                    status: 'PENDING'
                                 };
 
                                 await this.repository.upsert(data);
@@ -92,27 +110,9 @@ export class CatalogService {
                             }
                         }
 
+                        // Notification to Owner/Admin
                         if (successCount > 0) {
-                            // Import logically from shared or future location.
-                            // Assuming notifications will be refactored to src/modules/notifications/application/staff-notification.service
-                            // usage: import(path)
-                            import('../../notifications/application/staff-notification.service').then(async (service) => {
-                                try {
-                                    const pharmacies = await this.repository.findAllActivePharmacies();
-                                    for (const ph of pharmacies) {
-                                        await service.default.notifyPharmacy(
-                                            ph.id,
-                                            'CATALOG_IMPORTED',
-                                            'New Catalog Available',
-                                            `A new catalog has been imported (Supplier: ${supplierId}). ${successCount} items processed.`,
-                                            { supplierId, pharmaRepId, count: successCount },
-                                            ['MANAGER']
-                                        );
-                                    }
-                                } catch (err) {
-                                    console.error('Failed to notify catalog import', err);
-                                }
-                            }).catch(err => console.error('Failed to import notification service', err));
+                            this.notifyNewCatalog(supplierId, successCount);
                         }
 
                         resolve({ successCount, errorCount: errors.length, errors });
@@ -122,6 +122,36 @@ export class CatalogService {
                 })
                 .on('error', (error: any) => reject(error));
         });
+    }
+
+    private async notifyNewCatalog(supplierId: string, count: number) {
+        try {
+            const service = await import('../../notifications/application/staff-notification.service');
+            const pharmacies = await this.repository.findAllActivePharmacies();
+            for (const ph of pharmacies) {
+                await service.default.notifyPharmacy(
+                    ph.id,
+                    'CATALOG_IMPORTED',
+                    'New Catalog Submissions',
+                    `A new catalog has been submitted (Supplier ID: ${supplierId}). ${count} items are pending approval.`,
+                    { supplierId, count },
+                    ['MANAGER']
+                );
+            }
+        } catch (err) {
+            console.error('Failed to notify catalog import', err);
+        }
+    }
+
+    // Approval Flow logic
+    async getPendingItems() {
+        return this.repository.findPendingItems();
+    }
+
+    async approveCatalogItems(ids: string[]) {
+        if (!ids || ids.length === 0) throw new AppError('IDs are required', 400, 'BAD_REQUEST');
+        await this.repository.approveItems(ids);
+        return { message: `${ids.length} items approved successfully` };
     }
 
     async sendPurchaseRequest(data: SendPurchaseRequestDto) {
@@ -156,7 +186,6 @@ export class CatalogService {
         }
 
         const results = [];
-        // Using ES6 import at top of file
 
         for (const group of itemsByRep.values()) {
             const { rep, items: repItems } = group;

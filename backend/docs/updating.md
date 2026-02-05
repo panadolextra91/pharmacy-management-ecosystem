@@ -54,6 +54,12 @@ Hệ thống được xây dựng trên stack: **Node.js (Express) + TypeScript 
   - Validate `quantity >= 1`, `unitId` phải thuộc về `inventoryId`.
 - **Master Seed Script**: `prisma/seed.ts` chuẩn chỉnh, tạo dữ liệu demo FIFO.
 
+### ✅ Pharma Rep Catalog Upload (OTP-based) 🧪
+- **Secure Upload**: Reps authenticate via OTP (Email) instead of passwords.
+- **CSV Sanitization**: Ngăn chặn Excel Injection cho các file catalog được tải lên.
+- **Approval Flow**: Thuốc mới tải lên ở trạng thái `PENDING`, cần Manager/Owner duyệt mới được public.
+- **Data Normalization**: Tự động chuẩn hóa danh mục/nhãn hiệu để dữ liệu sạch sẽ.
+
 ### ✅ Code Audit & Alignment 🕵️‍♂️
 - **Staff Registration**: Fix Swagger thiếu header -> Giờ đã require `x-pharmacy-id`.
 - **Customer Login**: Hỗ trợ **OTP Login** (Phone + Code) + Password Login.

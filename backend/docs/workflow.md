@@ -66,19 +66,26 @@ This document outlines the core workflows of the Pharmacy Management System, det
 
 ## 3. Global Catalog & Purchase Requests (Email Bridge)
 
-**Actors**: Owner, Pharma Rep
+**Actors**: Owner, Pharma Rep, System Admin
 
-### Catalog Ingestion
-1.  **Admin** uploads CSV file (`POST /api/catalog/upload`).
-2.  **System** parses CSV stream.
-3.  **System** upserts medicines into `GlobalMedicineCatalog`.
+### Catalog Ingestion (OTP-Verified) 🧪
+1.  **Pharma Rep** requests an OTP via email (`POST /api/catalog/request-otp`).
+2.  **Rep** uploads CSV file with OTP, email, and supplier info (`POST /api/catalog/upload`).
+3.  **System** verifies OTP, parses CSV stream, and applies **Sanitization** (Excel-safe).
+4.  **System** upserts medicines into `GlobalMedicineCatalog` with `status = PENDING`.
+5.  **System** notifies all **MANAGERS** and **OWNERS** via Staff Notification system.
+
+### Catalog Approval Flow
+1.  **Owner/Admin** views pending items (`GET /api/catalog/pending`).
+2.  **Owner/Admin** selects items and approves them (`PATCH /api/catalog/approve`).
+3.  **System** updates `status = APPROVED`. Medicines are now available for all pharmacies to browse or import.
 
 ### Purchase Request (Email Bridge)
-1.  **Owner** selects multiple items from the Global Catalog.
+1.  **Owner** selects multiple items from the Global Catalog (Approved only).
 2.  **System** groups items by `PharmaSalesRep`.
 3.  **System** generates a **PENDING Purchase Invoice** for tracking.
 4.  **System** sends an email to each Rep via `nodemailer` with the requested items.
-5.  **Owner** later marks the Purchase Invoice as COMPLETED when goods arrive.
+5.  **Owner** later marks the Purchase Invoice as COMPLETED khi hàng về (adds to local inventory).
 
 ---
 

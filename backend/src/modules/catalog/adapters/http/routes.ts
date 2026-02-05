@@ -1,23 +1,25 @@
 import { Router } from 'express';
 import catalogController from './catalog.controller';
 import { validate } from '../../../../shared/middleware/validation.middleware';
-import { authenticate } from '../../../../shared/middleware/auth.middleware';
-// import { requirePharmacyAccess } from '../../../../shared/middleware/tenant.middleware';
-import { createGlobalMedicineSchema, updateGlobalMedicineSchema, queryGlobalMedicineSchema } from './validators';
-// import { upload } from '../../../../shared/middleware/upload.middleware'; // To be uncommented when found
+import { authenticate, requireOwner, requireSystemAdmin } from '../../../../shared/middleware/auth.middleware';
+import { queryGlobalMedicineSchema } from './validators';
+import { upload } from '../../../../shared/middleware/upload.middleware';
 
 const router = Router();
 
-// Public routes (or protected if needed - assuming pharmacy staff can view)
+// 1. PUBLIC ROUTES (Rep OTP & Upload)
+router.post('/request-otp', catalogController.requestCatalogOtp.bind(catalogController));
+router.post('/upload', upload.single('file'), catalogController.uploadCatalog.bind(catalogController));
+
+// 2. PROTECTED ROUTES (Standard browsing)
 router.get('/', authenticate, validate(queryGlobalMedicineSchema), catalogController.findAll.bind(catalogController));
 router.get('/:id', authenticate, catalogController.findById.bind(catalogController));
 
-// Protected routes (Admin/Rep only? For now, allow authenticated)
-// In real app, might need Roles.ADMIN or specific permissions
-// router.post('/purchase-request', authenticate, catalogController.sendPurchaseRequest.bind(catalogController));
-// router.post('/upload', authenticate, catalogController.uploadCatalog.bind(catalogController));
-router.post('/', authenticate, validate(createGlobalMedicineSchema), catalogController.create.bind(catalogController));
-router.patch('/:id', authenticate, validate(updateGlobalMedicineSchema), catalogController.update.bind(catalogController));
-router.delete('/:id', authenticate, catalogController.delete.bind(catalogController));
+// 3. OWNER/ADMIN ONLY (Approval Flow)
+router.get('/pending', authenticate, requireOwner, catalogController.getPendingItems.bind(catalogController));
+router.patch('/approve', authenticate, requireOwner, catalogController.approveCatalogItems.bind(catalogController));
+
+// Standard CRUD (Restricted)
+router.delete('/:id', authenticate, requireSystemAdmin, catalogController.delete.bind(catalogController));
 
 export default router;

@@ -130,4 +130,30 @@ export class PrismaAuthRepository implements IAuthRepository {
             select: { id: true, name: true }
         });
     }
+
+    // Pharma Sales Rep
+    async findPharmaRepByEmail(email: string): Promise<any | null> {
+        return prisma.pharmaSalesRep.findUnique({ where: { email } });
+    }
+
+    async updatePharmaRepOtp(email: string, otp: string, expiresAt: Date): Promise<void> {
+        await prisma.pharmaSalesRep.update({
+            where: { email },
+            data: {
+                lastOtp: otp,
+                otpExpiresAt: expiresAt,
+                isVerified: false
+            }
+        });
+    }
+
+    async verifyPharmaRepOtp(email: string, otp: string): Promise<any | null> {
+        return prisma.pharmaSalesRep.findFirst({
+            where: {
+                email,
+                lastOtp: otp,
+                otpExpiresAt: { gt: new Date() }
+            }
+        });
+    }
 }
