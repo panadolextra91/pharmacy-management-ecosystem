@@ -38,15 +38,20 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Swagger UI Documentation (does not touch controller logic)
+import { setupSwagger } from './swagger';
+setupSwagger(app);
+
 // API routes
-import authRoutes from './modules/access-control/routes';
-import catalogRoutes from './modules/catalog/routes';
-import salesRoutes from './modules/sales/routes';
-import inventoryRoutes from './modules/inventory/routes';
-import analyticsRoutes from './modules/analytics/routes';
-import customerRoutes from './modules/customers/routes';
-import reminderRoutes from './modules/reminders/routes';
-import notificationRoutes from './modules/notifications/routes';
+import authRoutes from './modules/access-control/adapters/http/routes';
+import catalogRoutes from './modules/catalog/adapters/http/routes'; // Assuming refactored
+import salesRoutes from './modules/sales/adapters/http/routes';
+import inventoryRoutes from './modules/inventory/adapters/http/inventory.routes'; // Verified filename
+import analyticsRoutes from './modules/analytics/adapters/http/routes';
+import customerRoutes from './modules/customers/adapters/http/routes';
+import reminderRoutes from './modules/reminders/adapters/http/routes';
+import notificationRoutes from './modules/notifications/adapters/http/routes';
+import purchaseRoutes from './modules/purchases/adapters/http/routes';
 
 app.get('/api', (_req, res) => {
   res.json({
@@ -54,8 +59,6 @@ app.get('/api', (_req, res) => {
     version: '1.0.0',
   });
 });
-
-import purchaseRoutes from './modules/purchases/routes';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/catalog', catalogRoutes);

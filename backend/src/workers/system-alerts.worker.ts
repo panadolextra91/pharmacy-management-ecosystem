@@ -1,5 +1,5 @@
 import prisma from '../shared/config/database';
-import staffNotificationService from '../modules/notifications/services/staff-notification.service';
+import staffNotificationService from '../modules/notifications/application/staff-notification.service';
 import logger from '../shared/utils/logger';
 import dayjs from 'dayjs';
 

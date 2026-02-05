@@ -1,0 +1,1345 @@
+openapi: 3.0.3
+info:
+  title: Pharmacy Management System API
+  description: |
+    ## 🏥 Hệ Thống Quản Lý Nhà Thuốc (SaaS)
+    
+    API Backend cho hệ thống quản lý nhà thuốc đa tenant.
+    
+    ### Roles:
+    - **System Admin**: Quản lý toàn hệ thống (God Mode)
+    - **Owner**: Chủ nhà thuốc (quản lý nhiều nhà thuốc)
+    - **Staff**: Nhân viên (Manager, Pharmacist, Cashier)
+    - **Customer**: Khách hàng (mobile app)
+    
+    ### Authentication:
+    Sử dụng JWT Bearer Token. Đăng nhập để lấy token, sau đó click **Authorize** và paste token vào.
+  version: 1.0.0
+  contact:
+    name: Pharmacy SaaS Support
+    email: support@pharmacy-saas.com
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development Server
+  - url: https://api.pharmacy-saas.com/api
+    description: Production Server
+
+tags:
+  - name: System Admin
+    description: God Mode - Quản lý Owner và hệ thống
+  - name: Auth - Owner
+    description: Đăng ký/Đăng nhập Owner
+  - name: Auth - Staff
+    description: Đăng ký/Đăng nhập Staff
+  - name: Auth - Customer
+    description: Đăng ký/Đăng nhập Customer
+  - name: Staff Management
+    description: Quản lý nhân viên (Owner only)
+  - name: Inventory
+    description: Quản lý kho hàng
+  - name: Sales
+    description: Bán hàng & POS
+  - name: Purchases
+    description: Nhập hàng
+  - name: Analytics
+    description: Thống kê & Báo cáo
+  - name: Customers
+    description: Quản lý khách hàng (CRM)
+  - name: Catalog
+    description: Danh mục thuốc toàn hệ thống
+  - name: Notifications
+    description: Thông báo nội bộ
+  - name: Reminders
+    description: Nhắc uống thuốc (Customer)
+
+security:
+  - BearerAuth: []
+
+paths:
+  # ==================== SYSTEM ADMIN ====================
+  /auth/admin/login:
+    post:
+      tags: [System Admin]
+      summary: Login System Admin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  example: admin@pharmacy-saas.com
+                password:
+                  type: string
+                  example: SuperSecure@2026!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/admin/owners:
+    get:
+      tags: [System Admin]
+      summary: List all Owners
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, ACTIVE, SUSPENDED]
+          description: Filter by status
+      responses:
+        '200':
+          description: List of owners
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/OwnerSummary'
+                  count:
+                    type: integer
+
+  /auth/admin/owners/{id}:
+    get:
+      tags: [System Admin]
+      summary: Get Owner details
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Owner details with pharmacies
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnerDetail'
+
+  /auth/admin/owners/{id}/approve:
+    put:
+      tags: [System Admin]
+      summary: Approve pending Owner
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                subscriptionExpiry:
+                  type: string
+                  format: date-time
+                  description: Optional expiry date
+      responses:
+        '200':
+          description: Owner approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
+  /auth/admin/owners/{id}/suspend:
+    put:
+      tags: [System Admin]
+      summary: Suspend Owner
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: Policy violation
+      responses:
+        '200':
+          description: Owner suspended
+
+  /auth/admin/owners/{id}/reactivate:
+    put:
+      tags: [System Admin]
+      summary: Reactivate suspended Owner
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Owner reactivated
+
+  # ==================== AUTH - OWNER ====================
+  /auth/owners/register:
+    post:
+      tags: [Auth - Owner]
+      summary: Register new Owner
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterOwnerDto'
+      responses:
+        '201':
+          description: Registration successful (status = PENDING)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/owners/login:
+    post:
+      tags: [Auth - Owner]
+      summary: Login Owner
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '403':
+          description: Account pending or suspended
+
+  # ==================== AUTH - STAFF ====================
+  /auth/staff/register:
+    post:
+      tags: [Auth - Staff]
+      summary: Register new Staff (Owner only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterStaffDto'
+      responses:
+        '201':
+          description: Staff created
+
+  /auth/staff/login:
+    post:
+      tags: [Auth - Staff]
+      summary: Login Staff
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  # ==================== AUTH - CUSTOMER ====================
+  /auth/customers/register:
+    post:
+      tags: [Auth - Customer]
+      summary: Register Customer
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCustomerDto'
+      responses:
+        '201':
+          description: Customer registered
+
+  /auth/customers/login:
+    post:
+      tags: [Auth - Customer]
+      summary: Login Customer
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  example: "0901234567"
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+
+  /auth/otp/send:
+    post:
+      tags: [Auth - Customer]
+      summary: Send OTP
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+      responses:
+        '200':
+          description: OTP sent
+
+  /auth/otp/verify:
+    post:
+      tags: [Auth - Customer]
+      summary: Verify OTP
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone:
+                  type: string
+                otp:
+                  type: string
+      responses:
+        '200':
+          description: OTP verified
+
+  /auth/refresh:
+    post:
+      tags: [Auth - Owner, Auth - Staff, Auth - Customer]
+      summary: Refresh Token
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        '200':
+          description: New tokens returned
+
+  # ==================== STAFF MANAGEMENT ====================
+  /auth/staff:
+    get:
+      tags: [Staff Management]
+      summary: List all staff (Owner only)
+      responses:
+        '200':
+          description: Staff list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Staff'
+
+  /auth/staff/{id}:
+    patch:
+      tags: [Staff Management]
+      summary: Update staff
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum: [MANAGER, PHARMACIST, CASHIER]
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Staff updated
+    delete:
+      tags: [Staff Management]
+      summary: Deactivate staff
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Staff deactivated
+
+  # ==================== INVENTORY ====================
+  /inventory:
+    get:
+      tags: [Inventory]
+      summary: List inventory items
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Inventory list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedInventory'
+    post:
+      tags: [Inventory]
+      summary: Create inventory item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInventoryDto'
+      responses:
+        '201':
+          description: Item created
+
+  /inventory/{id}:
+    get:
+      tags: [Inventory]
+      summary: Get item details
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Item details with batches
+    patch:
+      tags: [Inventory]
+      summary: Update item
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventoryDto'
+      responses:
+        '200':
+          description: Item updated
+    delete:
+      tags: [Inventory]
+      summary: Delete item (soft delete)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Item deleted
+
+  /inventory/{id}/stock:
+    post:
+      tags: [Inventory]
+      summary: Add stock (Batch In)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddStockDto'
+      responses:
+        '201':
+          description: Stock added
+
+  /inventory/alerts/expiry:
+    get:
+      tags: [Inventory]
+      summary: Get expiring items
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        '200':
+          description: Expiring batches
+
+  /inventory/alerts/stock:
+    get:
+      tags: [Inventory]
+      summary: Get low stock items
+      responses:
+        '200':
+          description: Low stock items
+
+  # ==================== SALES ====================
+  /sales/orders:
+    post:
+      tags: [Sales]
+      summary: Create new order
+      description: Creates order, deducts stock (FIFO), captures cost price
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderDto'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /sales/invoices/{id}/receipt:
+    get:
+      tags: [Sales]
+      summary: Get receipt data
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Receipt JSON for printing
+
+  # ==================== PURCHASES ====================
+  /purchases:
+    get:
+      tags: [Purchases]
+      summary: List purchase invoices
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, CONFIRMED, CANCELLED]
+      responses:
+        '200':
+          description: Purchase invoices list
+    post:
+      tags: [Purchases]
+      summary: Create purchase invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePurchaseDto'
+      responses:
+        '201':
+          description: Invoice created
+
+  /purchases/{id}:
+    get:
+      tags: [Purchases]
+      summary: Get invoice details
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Invoice with items
+
+  /purchases/{id}/status:
+    patch:
+      tags: [Purchases]
+      summary: Update status (CONFIRMED adds stock)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PENDING, CONFIRMED, CANCELLED]
+      responses:
+        '200':
+          description: Status updated
+
+  # ==================== ANALYTICS ====================
+  /analytics/dashboard:
+    get:
+      tags: [Analytics]
+      summary: Get dashboard stats
+      description: Today's revenue, orders, low stock, expiring items
+      responses:
+        '200':
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardData'
+
+  /analytics/revenue-chart:
+    get:
+      tags: [Analytics]
+      summary: Revenue chart data
+      parameters:
+        - name: days
+          in: query
+          schema:
+            type: integer
+            default: 7
+      responses:
+        '200':
+          description: Chart data
+
+  /analytics/profit-loss:
+    get:
+      tags: [Analytics]
+      summary: P&L Report
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Profit/Loss report
+
+  /analytics/top-selling:
+    get:
+      tags: [Analytics]
+      summary: Top selling products
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Top products
+
+  # ==================== CUSTOMERS ====================
+  /customers:
+    get:
+      tags: [Customers]
+      summary: Search customers
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Name or phone
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Customer list
+    post:
+      tags: [Customers]
+      summary: Create customer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerDto'
+      responses:
+        '201':
+          description: Customer created
+
+  /customers/{id}:
+    get:
+      tags: [Customers]
+      summary: Get customer profile
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Customer with health info
+
+  # ==================== CATALOG ====================
+  /catalog:
+    get:
+      tags: [Catalog]
+      summary: List global medicines
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Medicine list
+    post:
+      tags: [Catalog]
+      summary: Create medicine
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCatalogItemDto'
+      responses:
+        '201':
+          description: Medicine created
+
+  /catalog/upload:
+    post:
+      tags: [Catalog]
+      summary: Bulk upload CSV
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                supplierId:
+                  type: string
+                pharmaRepId:
+                  type: string
+      responses:
+        '200':
+          description: Import result
+
+  # ==================== NOTIFICATIONS ====================
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      parameters:
+        - name: isRead
+          in: query
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Notification list
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Get unread count
+      responses:
+        '200':
+          description: Count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark as read
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Marked as read
+
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Mark all as read
+      responses:
+        '200':
+          description: All marked as read
+
+  # ==================== REMINDERS ====================
+  /reminders:
+    get:
+      tags: [Reminders]
+      summary: List my reminders
+      responses:
+        '200':
+          description: Reminder list
+    post:
+      tags: [Reminders]
+      summary: Create reminder
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReminderDto'
+      responses:
+        '201':
+          description: Reminder created
+
+  /reminders/{id}:
+    get:
+      tags: [Reminders]
+      summary: Get reminder
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Reminder details
+    patch:
+      tags: [Reminders]
+      summary: Update reminder
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Reminder updated
+    delete:
+      tags: [Reminders]
+      summary: Delete reminder
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Reminder deleted
+
+  /reminders/{id}/actions:
+    post:
+      tags: [Reminders]
+      summary: Log action (taken/skipped)
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [actionType]
+              properties:
+                actionType:
+                  type: string
+                  enum: [taken, skipped, missed]
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Action logged
+
+  /reminders/history:
+    get:
+      tags: [Reminders]
+      summary: Adherence history
+      responses:
+        '200':
+          description: History logs
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Paste JWT token từ response login
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Resource ID
+
+  schemas:
+    # ===== AUTH =====
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            user:
+              type: object
+              properties:
+                id:
+                  type: string
+                email:
+                  type: string
+                name:
+                  type: string
+                role:
+                  type: string
+            accessToken:
+              type: string
+            refreshToken:
+              type: string
+
+    LoginDto:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+
+    RegisterOwnerDto:
+      type: object
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+          example: owner@pharmacy.com
+        password:
+          type: string
+          minLength: 6
+        name:
+          type: string
+          example: Nguyễn Văn A
+        phone:
+          type: string
+          example: "0901234567"
+
+    RegisterStaffDto:
+      type: object
+      required: [email, password, name, role, pharmacyId]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+          enum: [MANAGER, PHARMACIST, CASHIER]
+        pharmacyId:
+          type: string
+
+    RegisterCustomerDto:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+
+    # ===== OWNER =====
+    OwnerSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, ACTIVE, SUSPENDED]
+        subscriptionExpiry:
+          type: string
+          format: date-time
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        _count:
+          type: object
+          properties:
+            pharmacies:
+              type: integer
+
+    OwnerDetail:
+      allOf:
+        - $ref: '#/components/schemas/OwnerSummary'
+        - type: object
+          properties:
+            pharmacies:
+              type: array
+              items:
+                $ref: '#/components/schemas/PharmacySummary'
+
+    # ===== PHARMACY =====
+    PharmacySummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        isActive:
+          type: boolean
+
+    # ===== STAFF =====
+    Staff:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [MANAGER, PHARMACIST, CASHIER]
+        isActive:
+          type: boolean
+        pharmacyId:
+          type: string
+
+    # ===== INVENTORY =====
+    InventoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: string
+        brandId:
+          type: string
+        totalStockLevel:
+          type: integer
+        minStockLevel:
+          type: integer
+        isActive:
+          type: boolean
+        isDeleted:
+          type: boolean
+
+    PaginatedInventory:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InventoryItem'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreateInventoryDto:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        categoryId:
+          type: string
+        brandId:
+          type: string
+        minStockLevel:
+          type: integer
+          default: 10
+
+    UpdateInventoryDto:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        minStockLevel:
+          type: integer
+
+    AddStockDto:
+      type: object
+      required: [batchCode, expiryDate, quantity]
+      properties:
+        batchCode:
+          type: string
+          example: LOT2026-001
+        expiryDate:
+          type: string
+          format: date
+        quantity:
+          type: integer
+        purchasePrice:
+          type: number
+          format: float
+        purchaseDate:
+          type: string
+          format: date
+
+    # ===== ORDERS =====
+    CreateOrderDto:
+      type: object
+      required: [items]
+      properties:
+        customerId:
+          type: string
+        isPosSale:
+          type: boolean
+          default: false
+        items:
+          type: array
+          items:
+            type: object
+            required: [inventoryId, quantity, price]
+            properties:
+              inventoryId:
+                type: string
+              quantity:
+                type: integer
+              price:
+                type: number
+              unitId:
+                type: string
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+        pharmacyId:
+          type: string
+        customerId:
+          type: string
+        totalAmount:
+          type: number
+        status:
+          type: string
+        paymentStatus:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItem'
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: string
+        inventoryId:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: number
+        costPrice:
+          type: number
+          description: Snapshot COGS at sale time
+
+    # ===== PURCHASES =====
+    CreatePurchaseDto:
+      type: object
+      required: [supplierId, items]
+      properties:
+        supplierId:
+          type: string
+        invoiceNumber:
+          type: string
+        invoiceDate:
+          type: string
+          format: date
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              inventoryId:
+                type: string
+              quantity:
+                type: integer
+              unitPrice:
+                type: number
+
+    # ===== ANALYTICS =====
+    DashboardData:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            todayRevenue:
+              type: number
+            todayOrders:
+              type: integer
+            lowStockCount:
+              type: integer
+            totalCustomers:
+              type: integer
+            lowStockItems:
+              type: array
+              items:
+                type: object
+            expiringBatches:
+              type: array
+              items:
+                type: object
+
+    # ===== CUSTOMERS =====
+    CreateCustomerDto:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [MALE, FEMALE, OTHER]
+
+    # ===== CATALOG =====
+    CreateCatalogItemDto:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        activeIngredient:
+          type: string
+        dosage:
+          type: string
+        packaging:
+          type: string
+        unitPrice:
+          type: number
+        categoryId:
+          type: string
+        brandId:
+          type: string
+        supplierId:
+          type: string
+
+    # ===== REMINDERS =====
+    CreateReminderDto:
+      type: object
+      required: [medicineName, time]
+      properties:
+        medicineName:
+          type: string
+        dosage:
+          type: string
+        type:
+          type: string
+          enum: [MEDICATION, SUPPLEMENT, OTHER]
+        frequencyType:
+          type: string
+          enum: [DAILY, SPECIFIC_DAYS, INTERVAL]
+        time:
+          type: string
+          example: "08:00"
+        specificDays:
+          type: array
+          items:
+            type: integer
+        intervalDays:
+          type: integer
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        notes:
+          type: string
+
+    # ===== GENERIC =====
+    SuccessMessage:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string

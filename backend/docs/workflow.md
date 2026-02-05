@@ -2,6 +2,32 @@
 
 This document outlines the core workflows of the Pharmacy Management System, detailing actors, actions, and system responses for each module.
 
+## 0. System Admin - Owner Approval Workflow 🔐
+
+**Actors**: System Admin (God Mode), Owner
+
+### Owner Registration Flow
+1.  **Owner** submits registration form (`POST /auth/owners/register`).
+2.  **System** creates Owner with `status = PENDING`.
+3.  **System** returns success (but Owner cannot login yet).
+
+### Owner Approval Flow (Admin Only)
+1.  **System Admin** logs in (`POST /auth/admin/login`).
+2.  **Admin** views pending registrations (`GET /auth/admin/owners?status=PENDING`).
+3.  **Admin** reviews Owner details (`GET /auth/admin/owners/:id`).
+4.  **Admin** approves Owner (`PUT /auth/admin/owners/:id/approve`).
+    - Optional: Set `subscriptionExpiry` date.
+5.  **System** updates `status = ACTIVE`.
+6.  **Owner** can now login and create unlimited Pharmacies/Staff.
+
+### Owner Suspension Flow
+1.  **Admin** suspends violating Owner (`PUT /auth/admin/owners/:id/suspend`).
+2.  **System** updates `status = SUSPENDED`.
+3.  **Owner** cannot login (receives `ACCOUNT_SUSPENDED` error).
+4.  **Admin** can reactivate later (`PUT /auth/admin/owners/:id/reactivate`).
+
+---
+
 ## 1. Authentication & Access Control
 
 **Actors**: Owner, Staff, Customer

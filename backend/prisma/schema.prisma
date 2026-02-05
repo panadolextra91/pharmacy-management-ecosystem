@@ -12,16 +12,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum OwnerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
 model Owner {
-  id         String     @id @default(cuid())
-  email      String     @unique
-  password   String
-  name       String
-  phone      String?
-  isActive   Boolean    @default(true) @map("is_active")
-  createdAt  DateTime   @default(now()) @map("created_at")
-  updatedAt  DateTime   @updatedAt @map("updated_at")
-  pharmacies Pharmacy[]
+  id                  String      @id @default(cuid())
+  email               String      @unique
+  password            String
+  name                String
+  phone               String?
+  status              OwnerStatus @default(PENDING)
+  subscriptionExpiry  DateTime?   @map("subscription_expiry")
+  isActive            Boolean     @default(true) @map("is_active")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  pharmacies          Pharmacy[]
 
   @@map("owners")
 }
@@ -246,6 +254,7 @@ model PharmacyInventory {
   storageLocationId String?                @map("storage_location_id")
   totalStockLevel   Int                    @default(0) @map("total_stock_level")
   isActive          Boolean                @default(true) @map("is_active")
+  isDeleted         Boolean                @default(false) @map("is_deleted")
   createdAt         DateTime               @default(now()) @map("created_at")
   updatedAt         DateTime               @updatedAt @map("updated_at")
   minStockLevel     Int                    @default(10) @map("min_stock_level")
@@ -292,6 +301,7 @@ model InventoryBatch {
   stockQuantity Int               @map("stock_quantity")
   purchasePrice Decimal?          @map("purchase_price") @db.Decimal(10, 2)
   purchaseDate  DateTime?         @map("purchase_date")
+  isDeleted     Boolean           @default(false) @map("is_deleted")
   createdAt     DateTime          @default(now()) @map("created_at")
   updatedAt     DateTime          @updatedAt @map("updated_at")
   inventory     PharmacyInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
@@ -337,6 +347,7 @@ model OrderItem {
   unitId      String?           @map("unit_id")
   quantity    Int
   price       Decimal           @db.Decimal(10, 2)
+  costPrice   Decimal           @default(0) @map("cost_price") @db.Decimal(19, 4)
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
   inventory   PharmacyInventory @relation(fields: [inventoryId], references: [id])
@@ -732,4 +743,15 @@ enum PurchaseStatus {
   PENDING
   CONFIRMED
   CANCELLED
+}
+
+model SystemAdmin {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_admins")
 }

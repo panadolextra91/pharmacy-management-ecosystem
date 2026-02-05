@@ -9,19 +9,19 @@ export const createTenantPrisma = (pharmacyId: string) => {
     query: {
       pharmacyInventory: {
         async findMany({ args, query }: { args: any; query: any }) {
-          args.where = { ...args.where, pharmacyId };
+          args.where = { ...args.where, pharmacyId, isDeleted: false };
           return query(args);
         },
         async findUnique({ args, query }: { args: any; query: any }) {
-          args.where = { ...args.where, pharmacyId };
+          args.where = { ...args.where, pharmacyId, isDeleted: false };
           return query(args);
         },
         async findFirst({ args, query }: { args: any; query: any }) {
-          args.where = { ...args.where, pharmacyId };
+          args.where = { ...args.where, pharmacyId, isDeleted: false };
           return query(args);
         },
         async count({ args, query }: { args: any; query: any }) {
-          args.where = { ...args.where, pharmacyId };
+          args.where = { ...args.where, pharmacyId, isDeleted: false };
           return query(args);
         },
       },
