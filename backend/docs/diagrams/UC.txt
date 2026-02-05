@@ -1,53 +1,73 @@
 @startuml
 left to right direction
+skinparam packageStyle rectangle
+
 actor "System Administrator" as Admin
 actor "Pharmacy Owner" as Owner
-actor "Staff (Pharmacist/Cashier)" as Staff
+actor "Staff (Pharmacist/Manager)" as Staff
 actor "Customer" as Customer
-actor "Pharma Sales Rep (External)" as Rep
+actor "Pharma Sales Rep" as Rep
 
 rectangle "Pharmacy Management System" {
 
   ' System Admin Use Cases
-  usecase "Manage Tenants & Subscriptions" as UC_ManageTenants
+  usecase "Manage Tenants & Owners (Approve/Suspend)" as UC_ManageOwners
   usecase "Manage Global Medicine Catalog" as UC_GlobalCatalog
+  usecase "Audit System Logs" as UC_Audit
+
+  ' Pharma Rep Use Cases
+  usecase "Request OTP for Upload" as UC_RepOTP
+  usecase "Upload CSV Catalog (OTP Verified)" as UC_RepUpload
 
   ' Owner Use Cases
+  usecase "Approve Pending Catalog Items" as UC_ApproveCatalog
   usecase "Manage Branch Settings" as UC_BranchSettings
   usecase "Manage Staff & Roles" as UC_ManageStaff
   usecase "Financial Reporting (P&L)" as UC_Financials
-  usecase "Request Stock (Email Bridge)" as UC_RequestStock
+  usecase "Request Purchase (Email Bridge)" as UC_RequestStock
 
   ' Staff Use Cases
   usecase "Process Sales (POS)" as UC_POS
-  usecase "Manage Customer Records" as UC_CustomerRecords
-  usecase "Inventory Batching" as UC_Inventory
+  usecase "Inventory Batching (FIFO/FEFO)" as UC_Inventory
+  usecase "Manage Customer Records (CRM)" as UC_CustomerRecords
 
   ' Customer Use Cases
+  usecase "Login via OTP/Password" as UC_CustAuth
   usecase "Order Medications" as UC_Order
-  usecase "Manage Health Records" as UC_Health
-  usecase "AI Consultation (Planned)" as UC_AI
+  usecase "Manage Health Records & Allergies" as UC_Health
+  usecase "Medicine Reminders" as UC_Reminders
 
-  ' Relationships
-  Admin --> UC_ManageTenants
+  ' Admin Relationships
+  Admin --> UC_ManageOwners
   Admin --> UC_GlobalCatalog
+  Admin --> UC_ApproveCatalog
+  Admin --> UC_Audit
 
+  ' Rep Relationships
+  Rep --> UC_RepOTP
+  Rep --> UC_RepUpload
+
+  ' Owner Relationships
+  Owner --> UC_ApproveCatalog
   Owner --> UC_BranchSettings
   Owner --> UC_ManageStaff
   Owner --> UC_Financials
   Owner --> UC_RequestStock
   Owner --|> Staff : extends
 
+  ' Staff Relationships
   Staff --> UC_POS
-  Staff --> UC_CustomerRecords
   Staff --> UC_Inventory
+  Staff --> UC_CustomerRecords
 
+  ' Customer Relationships
+  Customer --> UC_CustAuth
   Customer --> UC_Order
   Customer --> UC_Health
-  Customer --> UC_AI
+  Customer --> UC_Reminders
 
-  ' Rep interaction (Off-system)
-  UC_RequestStock ..> Rep : Email Notification
+  ' Cross-Actor Interactions
+  UC_RepUpload ..> UC_ApproveCatalog : <<triggers notification>>
 }
 @enduml
 
@@ -55,36 +75,168 @@ rectangle "Pharmacy Management System" {
 ACTORS & USE CASE DESCRIPTIONS
 ==================================================
 
-1. ACTOR: SYSTEM ADMINISTRATOR
-   - **Role**: The "Super User" of the SaaS platform.
-   - **Responsibilities**:
-     - Manages pharmacy registrations (Tenants) and subscription statuses.
-     - Maintains the Global Medicine Catalog (Central Database).
+1. ACTOR: SYSTEM ADMINISTRATOR (God Mode)
+   - **Role**: Platform operator managing the SaaS ecosystem.
+   - **New Workflows**: 
+     - Approves/Suspends **Owners** based on subscription status.
+     - Can override and manage the **Global Catalog** directly.
+     - Performs system-wide auditing and reconciliation.
 
-2. ACTOR: PHARMACY OWNER
-   - **Role**: The tenant owner who manages their specific pharmacy chain or store.
-   - **Responsibilities**:
-     - Has full control over their own pharmacy’s data.
-     - Manages staff accounts (Pharmacist/Cashier).
-     - Configures branch settings and views financial reports (Revenue, P&L).
+2. ACTOR: PHARMACY OWNER (Tenant)
+   - **Role**: Manages one or more pharmacy branches.
+   - **New Workflows**:
+     - **Catalog Approval**: Reviews and approves medicine lists uploaded by Pharma Reps before they become active.
+     - **Unified Management**: Uses `x-pharmacy-id` to switch context between different branches.
+     - **Financial Oversight**: Accesses P&L reports with snapshot-accurate cost pricing.
 
-3. ACTOR: STAFF (Pharmacist/Cashier)
-   - **Role**: Employees assigned to a specific pharmacy branch.
-   - **Responsibilities**:
-     - Perform daily operations: Inventory batching (stock in).
-     - Process sales (POS) and handle cash/QR payments.
-     - Customer record management (CRM) within their assigned branch.
+3. ACTOR: STAFF (Manager/Pharmacist/Cashier)
+   - **Role**: Operations-focused users within a specific pharmacy.
+   - **Workflows**:
+     - **Inventory**: Handles batch-based stock entry (FIFO/FEFO).
+     - **POS**: Processes sales using server-side pricing to ensure financial integrity.
+     - **CRM**: Manages customer health metrics and allergies during consultations.
 
-4. ACTOR: CUSTOMER
-   - **Role**: The end-user using the Mobile Application.
-   - **Responsibilities**:
-     - Manages personal health records.
-     - Orders medications via the app.
-     - Uses AI consultation (Future Feature).
+4. ACTOR: CUSTOMER (Mobile App User)
+   - **Role**: End consumers of the pharmacy services.
+   - **Workflows**:
+     - **Auth**: Secure login via OTP or Password.
+     - **Health**: Tracks vitals, allergies, and receives automated medicine reminders.
+     - **Ordering**: Purchases across different pharmacies while maintaining a global history.
 
-5. ACTOR: PHARMA SALES REP (External)
-   - **Role**: External suppliers (Data Entity).
-   - **Note**: Currently interacts via "Email Bridge" rather than direct login.
-   - **Responsibilities**:
-     - Receives Purchase Requests from Owners via email.
-     - Provides catalog updates (processed by System Admin).
+5. ACTOR: PHARMA SALES REP (Authenticated External)
+   - **Role**: External suppliers providing digital catalog data.
+   - **New Workflows**:
+     - **OTP Access**: Requests a temporary 6-digit code via email to authenticate.
+     - **Secure Upload**: Uploads CSV catalogs protected by **Excel Injection Sanitization**.
+     - **Status**: Uploaded items start as `PENDING`, awaiting Owner/Admin review.
+
+==================================================
+LATEX REPORT FORMATTED CONTENT (Copy to Report)
+==================================================
+
+\subsubsection{Actors}
+\begin{itemize}
+    \item \textbf{System Administrator (God Mode):}
+    \begin{itemize}
+        \item The Super User responsible for the overall SaaS platform health.
+        \item Manages pharmacy registrations (Tenants/Owners), approves/suspends subscriptions, and maintains the Global Medicine Catalog.
+    \end{itemize}
+    \item \textbf{Pharmacy Owner (Tenant):}
+    \begin{itemize}
+        \item The business owner managing one or more pharmacy branches.
+        \item Manages staff accounts, views multi-branch financial analytics (P\&L), and approves medicine catalogs submitted by external suppliers.
+    \end{itemize}
+    \item \textbf{Staff (Manager/Pharmacist/Cashier):}
+    \begin{itemize}
+        \item Employees assigned to specific pharmacy branches.
+        \item Perform daily operations: inventory management (FIFO/FEFO), retail sales processing (POS), and customer health consultations.
+    \end{itemize}
+    \item \textbf{Pharma Sales Rep (Authenticated External):}
+    \begin{itemize}
+        \item External suppliers providing product data to the ecosystem.
+        \item Authenticates via OTP to upload digital catalogs (CSV) for review and approval by Owners/Admins.
+    \end{itemize}
+    \item \textbf{Customer (Mobile User):}
+    \begin{itemize}
+        \item The end-user of the Mobile Application.
+        \item Orders medications, tracks health metrics (BMI, Vitals), manages allergies, and receives automated medicine schedules.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Use Cases (System Functionality)}
+\begin{itemize}
+    \item \textbf{Authentication}: Login (All Roles), Logout, Register (Owner/Customer), Verify Identity via OTP (Customer/Pharma Rep), Reset Password.
+    \item \textbf{Global Catalog Management}: View Medicines, Create/Update/Delete Catalog Items, Bulk Import CSV (OTP Secured), Filter by Category/Brand, Owner Approval Workflow for New Submissions.
+    \item \textbf{Inventory \& Warehousing}: Manage Storage Locations, Inventory Batching (Stock In), View Stock Levels, Automatic FIFO/FEFO Batch Deduction, Low Stock \& Expiry Alerts.
+    \item \textbf{Sales \& POS Operations}: Create Orders (Online/POS), Server-Side Pricing Validation, Generate Digital Invoices/Receipts, Search Orders by ID/Customer Name.
+    \item \textbf{Customer CRM \& Vitals}: Manage Profiles, Health Records, Allergies Tracking, Track Health Metrics (BP, Weight, BMI), View Order History.
+    \item \textbf{Medicine Reminders}: Create Schedules (Daily/Interval), Automated Push Notifications for Doses, Adherence Logging (Taken/Skipped/Missed).
+    \item \textbf{Staff \& Tenant Management}: Register/Update Staff Roles (Manager/Pharmacist), Approve/Suspend Pharmacy Owners, Manage Multi-tenant Branch Settings.
+    \item \textbf{SaaS Analytics \& Reports}: Daily/Monthly Revenue, P\&L Reports with Snapshot Pricing (COGS), Top Selling Products, Inventory Valuation.
+    \item \textbf{Communications}: Internal Staff Notifications, Purchase Request Bridge (Email to Reps), Automated System Alerts.
+\end{itemize}
+
+==================================================
+FUNCTIONAL REQUIREMENTS (System Detailed Specs)
+==================================================
+
+### 1. Requirements for System Administrator (God Mode)
+| ID | Requirement | Description |
+| :--- | :--- | :--- |
+| FR-ADM-01 | **Tenant Lifecycle Management** | System must allow Admin to approve new Owner registrations and suspend/reactivate accounts based on subscription status. |
+| FR-ADM-02 | **Master Catalog Authority** | Admin must be able to perform CRUD operations on the Global Medicine Catalog and override any pending entries. |
+| FR-ADM-03 | **Cross-Tenant Auditing** | System must provide tools to view logs and perform reconciliation across all pharmacy tenants. |
+
+### 2. Requirements for Pharmacy Owner (Tenant)
+| ID | Requirement | Description |
+| :--- | :--- | :--- |
+| FR-OWN-01 | **Branch & Staff Governance** | Owner must be able to manage multiple branch settings and assign specific roles (Manager, Pharmacist) to employees. |
+| FR-OWN-02 | **Catalog Gatekeeping** | System must notify Owner of new CSV uploads from Reps and provide an interface to Approve or Reject items before they go live. |
+| FR-OWN-03 | **Financial Snapshot Analytics** | System must generate P&L reports using immutable "Cost Price" captured at the exact moment of sale for financial accuracy. |
+| FR-OWN-04 | **Supplier Communication** | Owner must be able to generate and send Purchase Request emails to multiple Reps based on selected catalog items. |
+
+### 3. Requirements for Staff (Pharmacist/Manager)
+| ID | Requirement | Description |
+| :--- | :--- | :--- |
+| FR-STF-01 | **Secure POS Processing** | System must calculate order totals server-side using authorized Unit Prices, ignoring any client-side pricing overrides. |
+| FR-STF-02 | **FIFO/FEFO Stock Deduction** | System must automatically deduct stock from batches based on the earliest expiry date (FEFO) or oldest entry (FIFO) during sale. |
+| FR-STF-03 | **Customer Health Management** | Staff must be able to record customer vitals (BP, Weight), allergies, and view their purchase history across the pharmacy network. |
+
+### 4. Requirements for Pharma Sales Rep (Authenticated External)
+| ID | Requirement | Description |
+| :--- | :--- | :--- |
+| FR-REP-01 | **Passwordless Auth (OTP)** | System must allow Reps to authenticate using a temporary 6-digit code sent to their registered email for secure catalog updates. |
+| FR-REP-02 | **Sanitized CSV Ingestion** | System must sanitize and parse uploaded CSV catalogs to neutralize dangerous spreadsheet characters (Excel Injection protection). |
+| FR-REP-03 | **Pending Submission Status** | Catalog items uploaded by Reps must default to "PENDING" status until reviewed by a Pharmacy Owner or System Admin. |
+
+### 5. Requirements for Customer (Mobile User)
+| ID | Requirement | Description |
+| :--- | :--- | :--- |
+| FR-CUS-01 | **Medicine Adherence Hub** | System must trigger push notifications for scheduled doses and allow users to log actions (Taken/Skipped/Missed) back to the server. |
+| FR-CUS-02 | **Personal Health Dashboard** | Users must be able to view their BMI, health metrics history, and allergies recorded at any pharmacy in the ecosystem. |
+| FR-CUS-03 | **E-Commerce & Orders** | Customers must be able to browse available inventory at nearby pharmacies and place orders with real-time status tracking. |
+
+==================================================
+LATEX FORMATTED REQUIREMENTS (Copy to Report)
+==================================================
+
+\subsubsection{Functional Requirements}
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|p{4cm}|p{8cm}|}
+\hline
+\textbf{ID} & \textbf{Actor} & \textbf{Requirement Description} \ \hline
+FR-ADM-01 & System Admin & Manage Tenants: Approve/Suspend pharmacy owners and manage SaaS subscriptions. \ \hline
+FR-ADM-02 & System Admin & Global Catalog Authority: Maintain the central medicine database and override entries. \ \hline
+FR-OWN-01 & Pharmacy Owner & Catalog Gatekeeping: Approve or Reject medicine catalogs uploaded by Pharma Reps. \ \hline
+FR-OWN-02 & Pharmacy Owner & Multi-Branch Oversight: Manage staff and view P\&L reports across various pharmacy locations. \ \hline
+FR-STF-01 & Staff & FIFO/FEFO Sales: Automatically deduct stock from batches based on expiry dates during POS. \ \hline
+FR-STF-02 & Staff & CRM Management: Record customer vitals, allergies, and view purchase history. \ \hline
+FR-REP-01 & Pharma Rep & OTP Upload: Securely upload CSV catalogs using email-based one-time passwords. \ \hline
+FR-REP-02 & Pharma Rep & Data Sanitization: System neutralizes dangerous characters in CSV files (Excel Injection protection). \ \hline
+FR-CUS-01 & Customer & Adherence Hub: Receive dose notifications and log compliance (Taken/Skipped/Missed). \ \hline
+FR-CUS-02 & Customer & Health Dashboard: Automated BMI/BMR calculation and tracking of historical health metrics. \ \hline
+\end{tabular}
+\caption{Functional Requirements by Actor}
+\label{tab:functional_requirements}
+\end{table}
+
+\subsubsection{Non-Functional Requirements}
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|p{4cm}|p{8cm}|}
+\hline
+\textbf{Category} & \textbf{Requirement} & \textbf{Implementation Strategy} \ \hline
+\textbf{Security} & Data Isolation (Multi-Tenancy) & Row Level Security (RLS) enforced via Prisma middleware to prevent cross-pharmacy data leaks. \ \hline
+& Authentication & JWT-based access/refresh tokens and OTP-verified workflows for external sales reps. \ \hline
+& API Protection & Rate limiting and Helmet.js headers to mitigate Brute Force and common web attacks. \ \hline
+\textbf{Performance} & Caching & Redis-based coaching for heavy read operations like Analytics Dashboards (30s TTL). \ \hline
+& Background Workers & Offloading heavy tasks (Reminders/Reconciliation) to BullMQ to keep API response times low. \ \hline
+& Database Optimization & Indexed queries on frequently searched fields like Customer Phone and Medicine Name. \ \hline
+\textbf{Scalability} & Stateless Architecture & Backend designed as a stateless API to facilitate horizontal scaling via Docker containers. \ \hline
+& Monolith-to-Module & Modular folder structure allows for individual components to be extracted into Microservices later. \ \hline
+& Queue Management & Asynchronous job processing (Redis) ensures system stability during peak notification periods. \ \hline
+\end{tabular}
+\caption{Non-Functional Requirements: Security, Performance, and Scalability}
+\label{tab:non_functional_requirements}
+\end{table}
