@@ -205,6 +205,7 @@ paths:
       tags: [Auth - Owner]
       summary: Login Owner
       security: []
+      description: Login with Email/Password. Checks if account is ACTIVE.
       requestBody:
         required: true
         content:
@@ -226,6 +227,9 @@ paths:
     post:
       tags: [Auth - Staff]
       summary: Register new Staff (Owner only)
+      description: Register staff for a specific pharmacy.
+      parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
       requestBody:
         required: true
         content:
@@ -270,6 +274,10 @@ paths:
       responses:
         '201':
           description: Customer registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
 
   /auth/customers/login:
     post:
@@ -405,6 +413,7 @@ paths:
       tags: [Inventory]
       summary: List inventory items
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - name: page
           in: query
           schema:
@@ -433,6 +442,8 @@ paths:
     post:
       tags: [Inventory]
       summary: Create inventory item
+      parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
       requestBody:
         required: true
         content:
@@ -448,6 +459,7 @@ paths:
       tags: [Inventory]
       summary: Get item details
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - $ref: '#/components/parameters/IdParam'
       responses:
         '200':
@@ -456,6 +468,7 @@ paths:
       tags: [Inventory]
       summary: Update item
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - $ref: '#/components/parameters/IdParam'
       requestBody:
         content:
@@ -469,6 +482,7 @@ paths:
       tags: [Inventory]
       summary: Delete item (soft delete)
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - $ref: '#/components/parameters/IdParam'
       responses:
         '200':
@@ -479,6 +493,7 @@ paths:
       tags: [Inventory]
       summary: Add stock (Batch In)
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - $ref: '#/components/parameters/IdParam'
       requestBody:
         required: true
@@ -495,6 +510,7 @@ paths:
       tags: [Inventory]
       summary: Get expiring items
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - name: days
           in: query
           schema:
@@ -508,6 +524,8 @@ paths:
     get:
       tags: [Inventory]
       summary: Get low stock items
+      parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
       responses:
         '200':
           description: Low stock items
@@ -518,6 +536,8 @@ paths:
       tags: [Sales]
       summary: Create new order
       description: Creates order, deducts stock (FIFO), captures cost price
+      parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
       requestBody:
         required: true
         content:
@@ -537,6 +557,7 @@ paths:
       tags: [Sales]
       summary: Get receipt data
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - $ref: '#/components/parameters/IdParam'
       responses:
         '200':
@@ -622,6 +643,8 @@ paths:
         Dashboard data with Redis caching.
         - **TTL**: 30 seconds
         - Response includes `cached: true/false` and `ttl` for transparency
+      parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
       responses:
         '200':
           description: Dashboard data
@@ -635,6 +658,7 @@ paths:
       tags: [Analytics]
       summary: Revenue chart data
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - name: days
           in: query
           schema:
@@ -649,6 +673,7 @@ paths:
       tags: [Analytics]
       summary: P&L Report
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - name: startDate
           in: query
           required: true
@@ -670,6 +695,7 @@ paths:
       tags: [Analytics]
       summary: Top selling products
       parameters:
+        - $ref: '#/components/parameters/PharmacyIdHeader'
         - name: limit
           in: query
           schema:
@@ -917,6 +943,17 @@ components:
         type: string
       description: Resource ID
 
+    PharmacyIdHeader:
+      name: x-pharmacy-id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: |
+        Pharmacy ID for multi-tenant context.
+        Required for Owner accounts with multiple pharmacies.
+        Staff accounts auto-detect from their assigned pharmacy.
+
   schemas:
     # ===== AUTH =====
     AuthResponse:
@@ -1003,6 +1040,20 @@ components:
         password:
           type: string
 
+    LoginCustomerDto:
+      type: object
+      required: [phone]
+      properties:
+        phone:
+          type: string
+        password:
+          type: string
+          description: Optional (Password login)
+        otp:
+          type: string
+          description: Optional (OTP login)
+      description: Provide either password or otp. w/o password/otp -> Error.
+
     # ===== OWNER =====
     OwnerSummary:
       type: object
@@ -1074,6 +1125,7 @@ components:
     # ===== INVENTORY =====
     InventoryItem:
       type: object
+      description: Rich Inventory Data (Units, Batches, Category)
       properties:
         id:
           type: string
@@ -1089,6 +1141,48 @@ components:
           type: integer
         minStockLevel:
           type: integer
+        isActive:
+          type: boolean
+        isDeleted:
+          type: boolean
+        image:
+          type: string
+        category:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        units:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              conversionFactor:
+                type: integer
+              price:
+                type: number
+              isBaseUnit:
+                type: boolean
+        batches:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              batchCode:
+                type: string
+              expiryDate:
+                type: string
+                format: date-time
+              stockQuantity:
+                type: integer
         isActive:
           type: boolean
         isDeleted:
@@ -1159,26 +1253,42 @@ components:
     CreateOrderDto:
       type: object
       required: [items]
+      description: |
+        **SECURITY**: Server-side pricing applied.
+        - Price is fetched from InventoryUnit table, NOT from client
+        - unitId must belong to the inventoryId (verified server-side)
+        - quantity must be >= 1
       properties:
         customerId:
           type: string
+          description: Customer ID (required)
         isPosSale:
           type: boolean
           default: false
+          description: True = In-store sale (immediate delivery + payment)
+        paymentMethod:
+          type: string
+          enum: [CASH, TRANSFER, QR]
+          default: CASH
+        notes:
+          type: string
         items:
           type: array
+          minItems: 1
           items:
             type: object
-            required: [inventoryId, quantity, price]
+            required: [inventoryId, quantity, unitId]
             properties:
               inventoryId:
                 type: string
+                description: Pharmacy Inventory item ID
               quantity:
                 type: integer
-              price:
-                type: number
+                minimum: 1
+                description: Quantity (in specified unit, NOT base unit)
               unitId:
                 type: string
+                description: Unit ID from InventoryUnit table (NOT unit name)
 
     Order:
       type: object

@@ -33,7 +33,7 @@ This document outlines the core workflows of the Pharmacy Management System, det
 **Actors**: Owner, Staff, Customer
 
 ### Login Flow
-1.  **Actor** provides credentials (Phone/Password for Owner/Staff, Phone/OTP for Customer).
+1.  **Actor** provides credentials (Phone/Password for Owner/Staff, Phone/OTP **or** Password for Customer).
 2.  **System** validates credentials using `bcrypt` (for passwords) or `OTP Service`.
 3.  **System** generates Access Token (JWT) and Refresh Token.
 4.  **System** returns tokens and user profile.
@@ -41,7 +41,9 @@ This document outlines the core workflows of the Pharmacy Management System, det
 
 ### Tenant Isolation (Middleware)
 1.  **Actor** makes a request to a protected route (e.g., `/api/inventory`).
-2.  **Middleware** extracts `pharmacyId` from the Access Token.
+2.  **Middleware** determines `pharmacyId`:
+    *   **Staff**: Extracts from Access Token.
+    *   **Owner**: Checks `x-pharmacy-id` header + verifies ownership in DB.
 3.  **Middleware** enforces that all database queries for this request are scoped to that `pharmacyId`.
 
 ---
@@ -92,8 +94,8 @@ This document outlines the core workflows of the Pharmacy Management System, det
 ### Order Processing Workflow
 
 #### A. Order Creation
-1.  **Staff** adds items to cart (selecting specific unit: Box/Pill).
-2.  **System** calculates total price based on unit price.
+1.  **Staff** adds items to cart (selecting specific **unitId**: Box/Pill).
+2.  **System** calculates total price **(Server-Side)** based on `InventoryUnit.price`, ignoring any client-sent price.
 3.  **System** handles Stock Check:
     *   Converts requested unit to Base Unit.
     *   Checks if `totalStock` >= requested amount.
@@ -159,7 +161,7 @@ This document outlines the core workflows of the Pharmacy Management System, det
 ### Staff Management (Owner Exclusive)
 1.  **Pharmacy Owner** logs in.
 2.  **Owner** goes to "Staff" tab -> Creates new account for Pharmacist.
-3.  **System** validates `role=OWNER` -> Creates staff linked to Owner's pharmacy.
+3.  **System** validates `role=OWNER` and extracts `x-pharmacy-id` header -> Creates staff linked to specific pharmacy.
     *   *Note*: Regular Managers/Staff cannot access this module.
 
 ## 7. Medicine Reminders (Phase 6)

@@ -85,6 +85,26 @@
 
 ---
 
+### 7. Core Security & Stability 🛡️
+**Status**: ☑️ DONE
+
+**What was done**:
+- **Tenant Middleware Fix**: Updated `requirePharmacyAccess` to support `x-pharmacy-id` header for Owner accounts (verifying ownership against DB).
+- **Sales API Security**:
+  - Removed `price` from client request in `createOrder`.
+  - Added Server-side pricing lookup.
+  - Added strict validation: `quantity >= 1` and `unitId` ownership check.
+  - Fix: Owner can now test API directly via Swagger without "Pharmacy access required" error.
+- **Master Seed Script**: Replaced `seed-admin.ts` with comprehensive `seed.ts` (Correct field names, FIFO data ready).
+
+### 8. Code Audit & Alignment 🕵️‍♂️
+**Status**: ☑️ DONE
+
+**What was fixed**:
+- **Staff Registration**: Enforced `x-pharmacy-id` header in Swagger to match `requirePharmacyAccess` middleware logic.
+- **Customer Login**: Enabled **OTP Login** flow (`otp` field in DTO + Service logic) alongside password login.
+- **Inventory Schema**: Updated Swagger `InventoryItem` to return "Rich Data" (Units, Batches, Category) matching Code reality.
+
 ## Schema Changes Applied
 
 | Table | Column | Type | Purpose |

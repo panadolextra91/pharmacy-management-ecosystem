@@ -44,8 +44,20 @@ Hệ thống được xây dựng trên stack: **Node.js (Express) + TypeScript 
 
 ### ✅ Analytics Dashboard Caching ⚡
 - **Redis Cache**: Key `dashboard:${pharmacyId}`.
-- **TTL: 30 giây** (cho demo, production có thể tăng lên 5-10 phút).
+- **TTL: 30 seconds** (cho demo, production có thể tăng lên 5-10 phút).
 - Response thêm `cached: true/false` và `ttl` để debug.
+
+### ✅ Core Security & Stability 🛡️
+- **Tenant Middleware Fix**: Hỗ trợ header `x-pharmacy-id` cho Owner (verify permission DB).
+- **Sales API Security**:
+  - Loại bỏ `price` client gửi lên → Server tự tính.
+  - Validate `quantity >= 1`, `unitId` phải thuộc về `inventoryId`.
+- **Master Seed Script**: `prisma/seed.ts` chuẩn chỉnh, tạo dữ liệu demo FIFO.
+
+### ✅ Code Audit & Alignment 🕵️‍♂️
+- **Staff Registration**: Fix Swagger thiếu header -> Giờ đã require `x-pharmacy-id`.
+- **Customer Login**: Hỗ trợ **OTP Login** (Phone + Code) + Password Login.
+- **Inventory Data**: API trả về Rich Data (Units, Batches) thay vì chỉ thông tin cơ bản.
 
 ---
 
