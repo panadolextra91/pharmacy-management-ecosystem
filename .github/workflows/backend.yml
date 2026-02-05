@@ -62,9 +62,10 @@ jobs:
         run: npm run lint || echo "Linter not fully configured yet"
         continue-on-error: true
 
-      - name: Generate Prisma Client
+      - name: Generate Prisma Client (Safe Mode)
         working-directory: ./backend
-        run: npm run prisma:generate
+        # 👇 SỬA CHỖ NÀY: Thêm --generator client để bỏ qua ERD
+        run: npx prisma generate --generator client
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pharmacy_db_test
 
@@ -110,9 +111,10 @@ jobs:
         working-directory: ./backend
         run: npm ci
 
-      - name: Generate Prisma Client
+      - name: Generate Prisma Client (Safe Mode)
         working-directory: ./backend
-        run: npm run prisma:generate
+        # 👇 CHỖ NÀY BÀ SỬA ĐÚNG RỒI, NHƯNG TUI ĐỔI SANG NPX CHO CHUẨN LUÔN
+        run: npx prisma generate --generator client
 
       - name: Build TypeScript
         working-directory: ./backend
@@ -124,4 +126,3 @@ jobs:
           name: backend-build
           path: backend/dist
           retention-days: 7
-
