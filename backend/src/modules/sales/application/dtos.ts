@@ -1,8 +1,8 @@
 
 export interface OrderItemDto {
     inventoryId: string; // From PharmacyInventory
-    quantity: number;
-    unit: string; // 'Box', 'Pill', etc.
+    quantity: number;    // MUST be >= 1
+    unitId: string;      // Unit ID from InventoryUnit table (NOT name)
 }
 
 export interface CreateOrderDto {

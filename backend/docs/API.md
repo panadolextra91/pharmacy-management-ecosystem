@@ -67,24 +67,74 @@
 | PATCH | `/:id` | Update location | Yes |
 | DELETE | `/:id` | Delete location | Yes |
 
-### Inventory Items (`/api/inventory/items`)
+### 🔐 Authentication & Headers
+- **Authorization**: `Bearer <token>` (Required for all)
+- **x-pharmacy-id**: `string` (Required for Owner accounts to specify context. Staff accounts auto-detected).
 
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :--- |
-| GET | `/` | List inventory items (Query: `page`, `limit`, `search`, `categoryId`, `locationId`) | Yes |
-| GET | `/:id` | Get item details (includes units, batches) | Yes |
-| POST | `/` | Create new inventory item (with units) | Yes |
-| PATCH | `/:id` | Update item details | Yes |
-| DELETE | `/:id` | Delete item (only if no stock) | Yes |
-| POST | `/:id/stock` | Add stock (Batch In) | Yes |
-| POST | `/:id/adjust` | Adjust stock (Deduct) | Yes |
+#### Endpoints
+- `POST /auth/staff/register`: Requires `x-pharmacy-id` header (Owner only).
+- `POST /auth/customers/login`: Supports `password` OR `otp`.
 
-### Alerts (`/api/inventory/alerts`)
+---
 
-| Method | Endpoint | Description | Auth Required |
-| :--- | :--- | :--- | :--- |
-| GET | `/expiry` | Get items expiring soon (Query: `days`) | Yes |
-| GET | `/stock` | Get items below min stock level (totalStockLevel <= minStockLevel) | Yes |
+### 📦 Inventory (Kho hàng)
+**Base URL**: `/api/inventory`
+> **Note**: `GET /` List Items returns **RICH DATA** including:
+> - Full `units` list (with conversion factors)
+> - Active `batches` (FIFO/FEFO ready)
+> - Expanded `category` info
+
+| Method | Endpoint | Description | Headers |
+|--------|----------|-------------|---------|
+| `GET` | `/` | List inventory items (Rich Data) | `x-pharmacy-id` (Owner) |
+| `POST` | `/` | Create item | `x-pharmacy-id` (Owner) |
+| `PATCH` | `/:id` | Update item | `x-pharmacy-id` (Owner) |
+| `DELETE` | `/:id` | Soft delete item | `x-pharmacy-id` (Owner) |
+| `POST` | `/:id/stock` | Add stock (Batch In) | `x-pharmacy-id` (Owner) |
+| `GET` | `/alerts/expiry` | Get expiring items | `x-pharmacy-id` (Owner) |
+| `GET` | `/alerts/stock` | Get low stock items | `x-pharmacy-id` (Owner) |
+
+---
+
+### 💊 Sales (Bán hàng)
+**Base URL**: `/api/sales`
+
+#### 1. Create Order
+`POST /api/sales/orders`
+
+**Headers**: `x-pharmacy-id` (Owner)
+
+**Request Body** (Secure - Server-side Pricing):
+```json
+{
+  "customerId": "cus_123",
+  "paymentMethod": "CASH",
+  "isPosSale": true,
+  "items": [
+    {
+      "inventoryId": "inv_123",
+      "quantity": 2,      // Must be >= 1
+      "unitId": "unit_456" // ID from InventoryUnit table
+    }
+  ]
+}
+```
+
+> **Note**: `price` is NO LONGER accepted from client. Server calculates price based on `unitId`.
+
+---
+
+### 📊 Analytics (Báo cáo)
+**Base URL**: `/api/analytics`
+
+| Method | Endpoint | Description | Caching (Redis) |
+|--------|----------|-------------|-----------------|
+| `GET` | `/dashboard` | General Stats (Revenue, Low Stock) | **30s TTL** |
+| `GET` | `/revenue-chart` | Chart Data (Last 7 days) | No |
+| `GET` | `/profit-loss` | P&L Report | No |
+| `GET` | `/top-selling` | Top Products | No |
+
+> **Headers**: All Analytics endpoints accept `x-pharmacy-id` for Owner context.
 
 ## Purchase Management (`/api/purchases`)
 *Scoped to specific Pharmacy. Requires `pharmacyId` context.*

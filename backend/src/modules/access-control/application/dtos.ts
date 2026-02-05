@@ -34,7 +34,8 @@ export interface RegisterCustomerDto {
 
 export interface LoginCustomerDto {
   phone: string;
-  password?: string; // Optional for OTP-based login
+  password?: string; // Optional (Password login)
+  otp?: string;      // Optional (OTP login)
 }
 
 export interface VerifyOtpDto {
