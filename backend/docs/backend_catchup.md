@@ -47,7 +47,12 @@
     - *Missing:* Robust frequency handling (e.g., "Every Mon, Wed").
     - *Action:* Refine `scheduler.worker.ts` to handle complex recurring schedules.
 
-3.  **Subscription Logic**
+4.  **Real-Time Ecosystem (Socket.io)**
+    - *Status:* ✅ **COMPLETED (Feb 7)**
+    - *Features:* New Order Alert (POS), Low Stock Alert.
+    - *Tech:* Hybrid Adapter (Redis/Memory), Singleton Service.
+
+5.  **Subscription Logic**
     - *Decision:* Deprioritized complex tier limits for MVP.
     - *Action:* Hardcode "Premium" features for now to focus on core flow.
 

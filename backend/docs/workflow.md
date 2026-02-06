@@ -171,6 +171,8 @@ This document outlines the core workflows of the Pharmacy Management System, det
 1.  **Staff** processes payment (Cash/Transfer).
 2.  **System** updates Order `paymentStatus` to `PAID`.
 3.  **System** generates `PharmacyInvoice` linked to the Order.
+    *   **Auto-Generation**: For POS Sales (`isPosSale: true`), Invoice is created immediately upon payment.
+    *   **Online Orders**: Invoice created when payment gateway callback confirms success.
 4.  **System** generates Receipt Data (JSON) for the Frontend, which renders and sends to printer:
     *   Pharmacy Info
     *   Items (Name, Quantity, Price)
@@ -330,7 +332,17 @@ const customer = await TestFactory.createCustomer();
 3.  **Developer** runs `npm run profile:api`.
 4.  **Clinic.js** wraps the Node.js process and attaches probes.
 5.  **Autocannon** fires 50 concurrent requests for 10 seconds.
-6.  **Clinic.js** generates HTML Report:
-    - **Green Line**: Event Loop Delay (Should be flat).
-    - **Red Line**: CPU Usage (Should match load).
 7.  **Developer** verifies "Event Loop Delay" < 10ms.
+
+---
+
+## 11. Real-Time Notification Workflow (Socket.io) ⚡
+**Actors**: Staff, Queue System
+
+### Order Alert Flow
+1.  **Staff** logs in -> Access Token contains `pharmacyId`.
+2.  **Client** connects to WebSocket (`/`) with Token in handshake.
+3.  **Server** validates Token -> Joins socket to `pharmacy:{id}` room.
+4.  **Server** (on `SalesService.createOrder`) emits `order:created` event to `pharmacy:{id}`.
+5.  **Client** receives event -> Triggers "Ting Ting" sound + Toast Notification.
+6.  **Fail-Safe**: If Client is offline, they will see the new order in "Pending List" upon reconnect/refresh.

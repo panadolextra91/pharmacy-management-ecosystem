@@ -38,3 +38,10 @@ prisma/migrations/
 # Docker
 docker-compose.override.yml
 
+
+# Reports
+*_report.html
+profile_api.html
+.clinic/
+.scannerwork/
+

@@ -1,86 +1,67 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# dependencies
+# === DEPENDENCIES ===
 node_modules/
-.cursor/
+.pnp
+.pnp.js
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-app-example
-
-# generated native folders
-/ios
-/android
-
-# Dependencies
-node_modules/
-
-
-# Build output
+# === BUILD OUTPUT ===
 dist/
 build/
+web-build/
+.tsbuildinfo
 
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Logs
+# === LOGS & DEBUG ===
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.clinic/
 
-# IDE
+# === ENVIRONMENT VARIABLES (SECURITY) ===
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# === IDE & OS FILES ===
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
-
-# OS
 .DS_Store
 Thumbs.db
+project.xcworkspace/
 
-# Testing
+# === TESTING & QUALITY ===
 coverage/
 .nyc_output/
+.scannerwork/
+.sonarqube/
 
-# Prisma
-backend/prisma/migrations/
+# === EXPO / REACT NATIVE ===
+.expo/
+expo-env.d.ts
+/ios
+/android
+*.jks
+*.p8
+*.p12
+*.mobileprovision
 
-# Docker
+# === METRO ===
+.metro-health-check*
+
+# === PRISMA (Backend) ===
+# Note: Migrations folder should usually be committed,
+# but ignore generated client if it's inside src
+# backend/prisma/migrations/  <-- Thường migration PHẢI commit nha bà, để deploy nó chạy. Tui comment lại để bà cân nhắc.
+
+# === DOCKER ===
 docker-compose.override.yml
-

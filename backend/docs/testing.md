@@ -10,7 +10,9 @@ This document tracks the progress and results of the automated testing initiativ
 ## ✅ Phase 1: Infrastructure Setup (Completed)
 *   [x] **Test Environment**: Configured `pharmacy_test` database (isolated from dev).
 *   [x] **Test Runner**: Jest + ts-jest configured.
+*   [x] **Test Runner**: Jest + ts-jest configured.
 *   [x] **Factories**: `TestFactory` implemented for creating mock `Pharmacy`, `Inventory`, `Batch`, `Owner`, etc.
+*   [x] **Real-Time Verification**: `scripts/test_realtime.ts` automation script added.
 
 ---
 

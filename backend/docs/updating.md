@@ -101,7 +101,17 @@ Hệ thống được xây dựng trên stack: **Node.js (Express) + TypeScript 
 - **BullMQ Integration**: Hệ thống xử lý tác vụ nền (Background Jobs) bằng Redis Queue.
 - **Async Processing**: Gửi thông báo đơn hàng (Notifications) không làm chậm API tạo đơn.
 - **Fail-Fast Resilience**: Cơ chế tự bảo vệ khi Redis sập (Không làm chết app).
+- **Fail-Fast Resilience**: Cơ chế tự bảo vệ khi Redis sập (Không làm chết app).
 - **Admin Dashboard**: Giao diện quản lý Queue trực quan.
+
+### ✅ Real-Time Ecosystem (Socket.io) ⚡ [NEW]
+- **Hybrid Architecture**: Auto-switch Redis/Memory adapter based on ENV.
+- **Events**: Instant "New Order" alerts for Staff/Owners.
+- **Security**: Strict JWT Auth handshake.
+
+### ✅ POS Auto-Invoice 🧾 [NEW]
+- **Automation**: Bán hàng tại quầy (POS) tự động sinh Invoice khi thanh toán thành công.
+- **Integrity**: Đảm bảo doanh thu luôn khớp với hóa đơn.
 
 ### ✅ Quality Assurance & Testing 🧪 [COMPLETE]
 - **Test Infrastructure**: Jest + ts-jest + separate `pharmacy_test` database.

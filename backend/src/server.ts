@@ -97,9 +97,16 @@ import { runSystemAlerts } from './workers/system-alerts.worker';
 import { runInventoryReconciliation } from './workers/inventory-reconciliation.worker';
 // import { runTokenCleanup } from './workers/token-cleanup.worker'; // Migrated to BullMQ
 
-const PORT = env.PORT || 3000;
+import { createServer } from 'http';
+import { socketService } from './shared/providers/socket.provider';
 
-app.listen(PORT, async () => {
+const PORT = env.PORT || 3000;
+const httpServer = createServer(app);
+
+// Initialize Socket.io (Singleton)
+socketService.init(httpServer);
+
+httpServer.listen(PORT, async () => {
   logger.info(`Server running on port ${PORT}`);
   logger.info(`📝 Environment: ${env.NODE_ENV}`);
 
