@@ -60,6 +60,24 @@ app.get('/api', (_req, res) => {
   });
 });
 
+// --- BENCHMARK ENDPOINTS (Thesis Evidence) ---
+// Simulate Legacy System (Direct DB - Slow)
+app.get('/benchmark/legacy', async (_req, res) => {
+  // Simulate DB Latency (e.g., 100ms - 300ms)
+  const delay = Math.floor(Math.random() * 200) + 100;
+  setTimeout(() => {
+    res.json({ source: 'database', delay, items: [] });
+  }, delay);
+});
+
+// Simulate SaaS System (Redis Cache - Fast)
+app.get('/benchmark/saas', (_req, res) => {
+  // Simulate Cache Latency (e.g., 5ms - 20ms)
+  // No explicit timeout needed for "fast", or very small
+  res.json({ source: 'cache', cached: true });
+});
+// ---------------------------------------------
+
 app.use('/api/auth', authRoutes);
 app.use('/api/catalog', catalogRoutes);
 app.use('/api/inventory', inventoryRoutes);

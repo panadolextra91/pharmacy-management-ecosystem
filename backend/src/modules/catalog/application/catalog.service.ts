@@ -16,20 +16,30 @@ export class CatalogService {
         const pharmaRep = await this.repository.findPharmaRepById(data.pharmaRepId);
         if (!pharmaRep) throw new AppError('Pharma Rep not found', 404, 'NOT_FOUND');
 
+        // invalidate cache
+        const CacheService = (await import('../../../shared/services/cache.service')).default;
+        await CacheService.delPattern('catalog:list:*');
+
         return this.repository.create(data);
     }
 
     async findAll(query: GlobalMedicineQueryDto) {
-        const result = await this.repository.findAll(query);
-        return {
-            data: result.data,
-            pagination: {
-                page: query.page || 1,
-                limit: query.limit || 20,
-                total: result.total,
-                totalPages: Math.ceil(result.total / (query.limit || 20)),
-            },
-        };
+        // Cache Key Strategy: catalog:list:{page}:{limit}:{search}:{category}
+        const cacheKey = `catalog:list:${query.page || 1}:${query.limit || 20}:${query.search || 'all'}:${query.categoryId || 'all'}`;
+        const CacheService = (await import('../../../shared/services/cache.service')).default;
+
+        return CacheService.getOrSet(cacheKey, async () => {
+            const result = await this.repository.findAll(query);
+            return {
+                data: result.data,
+                pagination: {
+                    page: query.page || 1,
+                    limit: query.limit || 20,
+                    total: result.total,
+                    totalPages: Math.ceil(result.total / (query.limit || 20)),
+                },
+            };
+        }, 3600); // 1 hour TTL
     }
 
     async findById(id: string) {

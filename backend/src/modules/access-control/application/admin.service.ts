@@ -32,7 +32,7 @@ export class AdminService {
 
         // 1. Suspend user in DB based on type
         switch (userType) {
-            case 'OWNER':
+            case 'OWNER': {
                 const owner = await prisma.owner.findUnique({ where: { id: userId } });
                 if (!owner) throw new AppError('Owner not found', 404, 'NOT_FOUND');
 
@@ -43,8 +43,9 @@ export class AdminService {
                 });
                 userName = owner.name;
                 break;
+            }
 
-            case 'STAFF':
+            case 'STAFF': {
                 // PharmacyStaff model (not Staff)
                 const staff = await prisma.pharmacyStaff.findUnique({
                     where: { id: userId },
@@ -61,14 +62,16 @@ export class AdminService {
                 pharmacyName = staff.pharmacy?.name;
                 ownerId = staff.pharmacy?.ownerId;
                 break;
+            }
 
-            case 'CUSTOMER':
+            case 'CUSTOMER': {
                 const customer = await prisma.customer.findUnique({ where: { id: userId } });
                 if (!customer) throw new AppError('Customer not found', 404, 'NOT_FOUND');
 
                 // Customers don't have status field, we'll just revoke tokens
                 userName = customer.fullName || customer.phone;
                 break;
+            }
 
             default:
                 throw new AppError('Invalid user type', 400, 'INVALID_USER_TYPE');

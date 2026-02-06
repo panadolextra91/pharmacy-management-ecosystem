@@ -180,6 +180,39 @@ paths:
         '200':
           description: Owner reactivated
 
+  /auth/admin/security/suspend/{id}:
+    post:
+      tags: [System Admin]
+      summary: ⚡ Kill Switch - Ban User (Owner/Staff/Customer)
+      description: |
+        **GOD MODE**: Global Ban. 
+        - Revokes ALL sessions (Flash Kill).
+        - Suspends account in DB.
+        - Sends Discord Security Alert.
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userType]
+              properties:
+                userType:
+                  type: string
+                  enum: [OWNER, STAFF, CUSTOMER]
+                reason:
+                  type: string
+                  default: "Violation of Terms"
+      responses:
+        '200':
+          description: User banned and sessions revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+
   # ==================== AUTH - OWNER ====================
   /auth/owners/register:
     post:
@@ -1286,10 +1319,7 @@ components:
                 format: date-time
               stockQuantity:
                 type: integer
-        isActive:
-          type: boolean
-        isDeleted:
-          type: boolean
+
 
     PaginatedInventory:
       type: object

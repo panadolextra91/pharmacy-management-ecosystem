@@ -1,0 +1,1077 @@
+==================================================
+ENTITY RELATIONSHIP DIAGRAM (ERD) DOCUMENTATION
+Pharmacy Management System (Codename: PharmaEco)
+==================================================
+
+==================================================
+PART 1: ERD DESCRIPTION
+==================================================
+
+## 1.1 Overview
+
+The PharmaEco database schema comprises **32 distinct entities** organized into 5 logical clusters, designed following a Multi-Tenant SaaS architecture with emphasis on data isolation, security audit trails, and healthcare compliance.
+
+The database is implemented using PostgreSQL with Prisma ORM, leveraging advanced features such as:
+- Row-Level Security (RLS) patterns via tenant isolation
+- Polymorphic relationships for unified token management
+- Immutable audit logging for forensic investigation
+- Snapshot pricing for accurate financial reporting
+
+---
+
+## 1.2 Entity Clusters
+
+### Cluster 1: Identity & Access Management (IAM) - 7 Entities
+Handles multi-tenancy, authentication, session management, and security auditing.
+
+| Entity | Primary Key | Description |
+|--------|-------------|-------------|
+| SystemAdmin | id (CUID) | Platform super-administrator with elevated privileges |
+| Owner | id (CUID) | Pharmacy business owner (Tenant root) |
+| Pharmacy | id (CUID) | Physical pharmacy branch (Tenant unit) |
+| PharmacyStaff | id (CUID) | Pharmacy employees with role-based access |
+| RefreshToken | id (CUID) | JWT refresh tokens with polymorphic user relations |
+| AuditLog | id (CUID) | Forensic security audit trail |
+| Otp | id (CUID) | One-Time Password verification codes |
+
+### Cluster 2: Product Catalog & Supplier Network - 5 Entities
+Manages the global medicine database and supplier ecosystem.
+
+| Entity | Primary Key | Description |
+|--------|-------------|-------------|
+| GlobalMedicineCatalog | id (CUID) | Central medicine registry with approval workflow |
+| Supplier | id (CUID) | Medicine suppliers/distributors |
+| PharmaSalesRep | id (CUID) | Supplier sales representatives with OTP authentication |
+| Category | id (CUID) | Medicine categories (Antibiotics, Painkillers, etc.) |
+| Brand | id (CUID) | Pharmaceutical brands with manufacturer info |
+
+### Cluster 3: Inventory & Procurement - 6 Entities
+Handles stock management, FIFO/FEFO batch tracking, and purchase orders.
+
+| Entity | Primary Key | Description |
+|--------|-------------|-------------|
+| PharmacyInventory | id (CUID) | Local pharmacy stock items |
+| InventoryBatch | id (CUID) | Stock batches with expiry dates for FIFO/FEFO |
+| InventoryUnit | id (CUID) | Selling units (Box, Strip, Pill) with pricing |
+| StorageLocation | id (CUID) | Warehouse storage locations |
+| PurchaseInvoice | id (CUID) | Purchase orders from suppliers |
+| PurchaseItem | id (CUID) | Purchase order line items |
+
+### Cluster 4: Order-to-Cash & Financial - 7 Entities
+Manages sales transactions, billing, fulfillment, and analytics.
+
+| Entity | Primary Key | Description |
+|--------|-------------|-------------|
+| PharmacyOrder | id (CUID) | Customer sales orders |
+| OrderItem | id (CUID) | Order line items with costPrice snapshot |
+| PharmacyInvoice | id (CUID) | Sales invoices |
+| InvoiceItem | id (CUID) | Invoice line items |
+| Payment | id (CUID) | Payment transaction records |
+| Delivery | id (CUID) | Order fulfillment and tracking |
+| PharmacyAnalytics | id (CUID) | Pre-computed daily revenue aggregates |
+
+### Cluster 5: Customer CRM & Health - 12 Entities
+Handles patient profiles, health data, medication adherence, and notifications.
+
+| Entity | Primary Key | Description |
+|--------|-------------|-------------|
+| Customer | id (CUID) | Patient/customer profile |
+| CustomerHealthMetrics | id (CUID) | Health vitals (1:1 with Customer) |
+| CustomerAllergy | id (CUID) | Allergy records |
+| CustomerHealthRecord | id (CUID) | Medical documents and records |
+| CustomerCart | id (CUID) | Shopping cart (1:1 with Customer) |
+| CartItem | id (CUID) | Cart line items |
+| MedicineReminder | id (CUID) | Medication reminder schedules |
+| ReminderNotification | id (CUID) | Push notification records |
+| ReminderLog | id (CUID) | Adherence tracking logs |
+| CustomerNotification | id (CUID) | General customer notifications |
+| CustomerPushToken | id (CUID) | Expo push notification tokens |
+| StaffNotification | id (CUID) | Staff alert notifications |
+
+---
+
+## 1.3 Security-Critical Design Decisions
+
+### 1.3.1 Multi-Tenancy Isolation
+- **Owner → Pharmacy** hierarchy enforces tenant boundaries
+- All pharmacy-scoped queries include `pharmacyId` filter
+- Cross-tenant data access is architecturally prevented
+
+### 1.3.2 Polymorphic RefreshToken
+- Single token table serves Owner, Staff, Customer, SystemAdmin
+- Enables unified **Kill Switch** functionality
+- Token rotation with reuse detection prevents replay attacks
+
+### 1.3.3 Immutable AuditLog
+- Records: actorId, actorType, action, resource, oldData, newData
+- Actions tracked: LOGIN, LOGOUT, CREATE, UPDATE, DELETE, EXPORT, IMPORT, APPROVE, REJECT, SUSPEND, REACTIVATE
+- IP address and User-Agent captured for forensics
+- No UPDATE/DELETE operations allowed on audit records
+
+### 1.3.4 Snapshot Pricing (OrderItem.costPrice)
+- Captures FIFO purchase cost at transaction time
+- Immutable after order creation
+- Enables accurate P&L even if source batches are deleted
+
+### 1.3.5 Soft Delete Pattern
+- PharmacyInventory.isDeleted, InventoryBatch.isDeleted
+- Preserves referential integrity for historical orders
+- Supports data recovery and audit requirements
+
+==================================================
+PART 2: PLANTUML ERD DIAGRAMS (CHEN NOTATION)
+==================================================
+
+==================================================
+PART 2.0: HIGH-LEVEL ERD OVERVIEW
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam nodesep 20
+skinparam ranksep 30
+
+title High-Level Entity Relationship Diagram\nPharmaEco System - 32 Entities
+
+' === ROW 1 ===
+package "Identity & Access Management" as IAM #E3F2FD {
+    entity "SystemAdmin" as SA
+    entity "Owner" as OW
+    entity "Pharmacy" as PH
+    entity "PharmacyStaff" as PS
+    entity "RefreshToken" as RT
+    entity "AuditLog" as AL
+    entity "Otp" as OTP
+}
+
+package "Product Catalog & Supplier" as CAT #F3E5F5 {
+    entity "GlobalMedicineCatalog" as GMC
+    entity "Supplier" as SUP
+    entity "PharmaSalesRep" as PSR
+    entity "Category" as CT
+    entity "Brand" as BRD
+}
+
+' === ROW 2 ===
+package "Inventory & Procurement" as INV #E8F5E9 {
+    entity "PharmacyInventory" as PI
+    entity "InventoryBatch" as IB
+    entity "InventoryUnit" as IU
+    entity "StorageLocation" as SL
+    entity "PurchaseInvoice" as PUI
+    entity "PurchaseItem" as PIT
+}
+
+package "Order-to-Cash & Financial" as FIN #FFEBEE {
+    entity "PharmacyOrder" as PO
+    entity "OrderItem" as OI
+    entity "PharmacyInvoice" as PINV
+    entity "InvoiceItem" as II
+    entity "Payment" as PAY
+    entity "Delivery" as DEL
+    entity "PharmacyAnalytics" as PA
+}
+
+' === ROW 3 ===
+package "Customer CRM & Health" as CRM #FCE4EC {
+    entity "Customer" as CU
+    entity "CustomerHealthMetrics" as CHM
+    entity "CustomerAllergy" as CAL
+    entity "CustomerHealthRecord" as CHR
+    entity "CustomerCart" as CC
+    entity "CartItem" as CI
+    entity "MedicineReminder" as MR
+    entity "ReminderNotification" as RN
+    entity "ReminderLog" as RL
+    entity "CustomerNotification" as CN
+    entity "CustomerPushToken" as CPT
+    entity "StaffNotification" as SN
+}
+
+' === LAYOUT: 2-COLUMN GRID ===
+IAM -[hidden]right-> CAT
+INV -[hidden]right-> FIN
+IAM -[hidden]down-> INV
+CAT -[hidden]down-> FIN
+FIN -[hidden]down-> CRM
+
+' === RELATIONSHIPS ===
+OW ||--o{ PH
+PH ||--o{ PS
+PH ||--o{ PI
+PH ||--o{ PO
+PH ||--o{ AL
+
+SUP ||--o{ PSR
+SUP ||--o{ GMC
+GMC }o--|| PI
+
+PI ||--o{ IB
+PI ||--o{ OI
+
+CU ||--o{ PO
+CU ||--o{ MR
+PO ||--o{ OI
+
+@enduml
+
+==================================================
+PART 2.1: CLUSTER 1 - IDENTITY & ACCESS MANAGEMENT
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+skinparam entityFontSize 12
+skinparam entityAttributeFontSize 11
+skinparam nodesep 25
+skinparam ranksep 35
+
+title ERD Cluster 1: Identity & Access Management\nMulti-Tenancy, Session Security & Audit Trail
+
+' === COLUMN 1: USER ENTITIES ===
+entity "SystemAdmin" as SA {
+    * id <<PK>>
+    --
+    email <<UNIQUE>>
+    password
+    name
+}
+
+entity "Owner" as OW {
+    * id <<PK>>
+    --
+    email <<UNIQUE>>
+    password
+    name
+    phone
+    status
+    is_active
+}
+
+entity "Pharmacy" as PH {
+    * id <<PK>>
+    --
+    # owner_id <<FK>>
+    name
+    address
+    location (lat, lng)
+    phone
+    hours
+    service_radius_km
+    is_active
+}
+
+entity "PharmacyStaff" as PS {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    username
+    password
+    name
+    email <<UNIQUE>>
+    role
+    is_active
+}
+
+' === COLUMN 2: SECURITY ENTITIES ===
+entity "RefreshToken" as RT {
+    * id <<PK>>
+    --
+    token <<UNIQUE>>
+    expires_at
+    revoked_at
+    replaced_by
+    ..polymorphic FK..
+    # owner_id <<FK>>
+    # staff_id <<FK>>
+    # customer_id <<FK>>
+    # admin_id <<FK>>
+}
+
+entity "AuditLog" as AL {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    actor_id
+    actor_type
+    action
+    resource
+    old_data
+    new_data
+    ip_address
+    <<IMMUTABLE>>
+}
+
+entity "Otp" as OTP {
+    * id <<PK>>
+    --
+    phone
+    otp
+    expires_at
+    is_used
+}
+
+' === NOTES ===
+note right of OW
+  **Kill Switch:**
+  status = SUSPENDED
+  → globalBan()
+end note
+
+note right of RT
+  **Polymorphic Token:**
+  One FK active per row
+  Token Rotation
+end note
+
+note bottom of AL
+  **IMMUTABLE**
+  No UPDATE/DELETE
+end note
+
+' === LAYOUT: 2 COLUMNS ===
+SA -[hidden]right-> RT
+OW -[hidden]right-> AL
+PH -[hidden]right-> OTP
+SA -[hidden]down-> OW
+OW -[hidden]down-> PH
+PH -[hidden]down-> PS
+RT -[hidden]down-> AL
+AL -[hidden]down-> OTP
+
+' === RELATIONSHIPS ===
+OW ||--o{ PH
+OW ||--o{ RT
+PH ||--o{ PS
+PH ||--o{ AL
+PS ||--o{ RT
+SA ||--o{ RT
+
+@enduml
+
+==================================================
+PART 2.2: CLUSTER 2 - PRODUCT CATALOG & SUPPLIER
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+skinparam entityFontSize 12
+skinparam entityAttributeFontSize 11
+skinparam nodesep 25
+skinparam ranksep 35
+
+title ERD Cluster 2: Product Catalog & Supplier Network\nGlobal Medicine Database & Supply Chain Integration
+
+' === COLUMN 1: SUPPLIER ENTITIES ===
+entity "Supplier" as SUP {
+    * id <<PK>>
+    --
+    name
+    contact_info
+    address
+}
+
+entity "PharmaSalesRep" as PSR {
+    * id <<PK>>
+    --
+    # supplier_id <<FK>>
+    name
+    email <<UNIQUE>>
+    phone
+    is_active
+    is_verified
+}
+
+' === COLUMN 2: CATALOG ENTITIES ===
+entity "GlobalMedicineCatalog" as GMC {
+    * id <<PK>>
+    --
+    name
+    manufacturer
+    description
+    packaging
+    active_ingredient
+    barcode
+    # category_id <<FK>>
+    # brand_id <<FK>>
+    # supplier_id <<FK>>
+    # pharma_rep_id <<FK>>
+    unit_price
+    status
+}
+
+entity "Category" as CAT {
+    * id <<PK>>
+    --
+    name <<UNIQUE>>
+    description
+}
+
+entity "Brand" as BRD {
+    * id <<PK>>
+    --
+    name <<UNIQUE>>
+    manufacturer
+    country
+    logo
+}
+
+' === NOTES ===
+note right of GMC
+  **Approval Workflow:**
+  PENDING → APPROVED
+  or REJECTED
+end note
+
+note bottom of PSR
+  **OTP Auth + CSV Sanitization**
+end note
+
+' === LAYOUT: 2 COLUMNS ===
+SUP -[hidden]right-> GMC
+PSR -[hidden]right-> CAT
+SUP -[hidden]down-> PSR
+GMC -[hidden]down-> CAT
+CAT -[hidden]down-> BRD
+
+' === RELATIONSHIPS ===
+SUP ||--o{ PSR
+SUP ||--o{ GMC
+PSR ||--o{ GMC
+CAT ||--o{ GMC
+BRD ||--o{ GMC
+
+@enduml
+
+==================================================
+PART 2.3: CLUSTER 3 - INVENTORY & PROCUREMENT
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+skinparam entityFontSize 12
+skinparam entityAttributeFontSize 11
+skinparam nodesep 25
+skinparam ranksep 35
+
+title ERD Cluster 3: Inventory & Procurement\nStock Management, FIFO/FEFO Batch Tracking
+
+' === COLUMN 1: INVENTORY ENTITIES ===
+entity "PharmacyInventory" as PI {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    # global_catalog_id <<FK>>
+    # category_id <<FK>>
+    # brand_id <<FK>>
+    # storage_location_id <<FK>>
+    name
+    description
+    image
+    total_stock_level
+    min_stock_level
+    is_active
+    is_deleted <<SOFT DELETE>>
+}
+
+entity "InventoryBatch" as IB {
+    * id <<PK>>
+    --
+    # inventory_id <<FK>>
+    batch_code
+    expiry_date <<INDEXED>>
+    stock_quantity
+    purchase_price <<COGS>>
+    is_deleted <<SOFT DELETE>>
+}
+
+entity "InventoryUnit" as IU {
+    * id <<PK>>
+    --
+    # inventory_id <<FK>>
+    name
+    conversion_factor
+    price
+    is_base_unit
+    is_default_selling
+}
+
+' === COLUMN 2: PROCUREMENT & STORAGE ===
+entity "StorageLocation" as SL {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    name
+    description
+    is_active
+}
+
+entity "PurchaseInvoice" as PUI {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    # supplier_id <<FK>>
+    invoice_number
+    invoice_date
+    total_amount
+    status
+}
+
+entity "PurchaseItem" as PIT {
+    * id <<PK>>
+    --
+    # purchase_invoice_id <<FK>>
+    # inventory_id <<FK>>
+    batch_code
+    expiry_date
+    quantity
+    unit_price
+    total_price
+}
+
+' === NOTES ===
+note right of IB
+  **FIFO/FEFO:**
+  expiry_date ASC
+  purchase_price → COGS
+end note
+
+note right of PI
+  **Soft Delete:**
+  Preserves FK integrity
+end note
+
+' === LAYOUT: 2 COLUMNS ===
+PI -[hidden]right-> SL
+IB -[hidden]right-> PUI
+IU -[hidden]right-> PIT
+PI -[hidden]down-> IB
+IB -[hidden]down-> IU
+SL -[hidden]down-> PUI
+PUI -[hidden]down-> PIT
+
+' === RELATIONSHIPS ===
+PI ||--o{ IB
+PI ||--o{ IU
+PI }o--o| SL
+PUI ||--o{ PIT
+PIT }o--|| PI
+
+@enduml
+
+==================================================
+PART 2.4: CLUSTER 4 - ORDER-TO-CASH & FINANCIAL
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+skinparam entityFontSize 12
+skinparam entityAttributeFontSize 11
+skinparam nodesep 25
+skinparam ranksep 35
+
+title ERD Cluster 4: Order-to-Cash & Financial\nSales Transactions, Snapshot Pricing & Revenue Analytics
+
+' === COLUMN 1: ORDER ENTITIES ===
+entity "PharmacyOrder" as PO {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    # customer_id <<FK>>
+    order_number <<UNIQUE>>
+    status
+    subtotal
+    delivery_fee
+    total_amount
+    shipping_address
+    payment_status
+}
+
+entity "OrderItem" as OI {
+    * id <<PK>>
+    --
+    # order_id <<FK>>
+    # inventory_id <<FK>>
+    # unit_id <<FK>>
+    quantity
+    price
+    **cost_price** <<SNAPSHOT>>
+}
+
+entity "PharmacyInvoice" as INV {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    # customer_id <<FK>>
+    # order_id <<FK>>
+    invoice_number <<UNIQUE>>
+    invoice_date
+    total_amount
+    type
+}
+
+entity "InvoiceItem" as II {
+    * id <<PK>>
+    --
+    # invoice_id <<FK>>
+    # inventory_id <<FK>>
+    quantity
+    price
+}
+
+' === COLUMN 2: PAYMENT & FULFILLMENT ===
+entity "Payment" as PAY {
+    * id <<PK>>
+    --
+    # order_id <<FK>>
+    amount
+    payment_method
+    status
+    transaction_id
+    paid_at
+}
+
+entity "Delivery" as DEL {
+    * id <<PK>>
+    --
+    # order_id <<FK>>
+    # pharmacy_id <<FK>>
+    # delivery_staff_id <<FK>>
+    delivery_service
+    delivery_fee
+    status
+    tracking_url
+}
+
+entity "PharmacyAnalytics" as PA {
+    * id <<PK>>
+    --
+    # pharmacy_id <<FK>>
+    date
+    total_revenue
+    total_orders
+    total_customers
+    average_order_value
+    total_profit <<DERIVED>>
+}
+
+' === NOTES ===
+note right of OI
+  **Snapshot Pricing:**
+  IMMUTABLE cost_price
+  Profit = price - cost_price
+end note
+
+note right of PA
+  **Materialized View:**
+  Pre-computed by worker
+end note
+
+' === LAYOUT: 2 COLUMNS ===
+PO -[hidden]right-> PAY
+OI -[hidden]right-> DEL
+INV -[hidden]right-> PA
+PO -[hidden]down-> OI
+OI -[hidden]down-> INV
+INV -[hidden]down-> II
+PAY -[hidden]down-> DEL
+DEL -[hidden]down-> PA
+
+' === RELATIONSHIPS ===
+PO ||--o{ OI
+PO ||--o| INV
+PO ||--o| PAY
+PO ||--o| DEL
+INV ||--o{ II
+
+@enduml
+
+==================================================
+PART 2.5: CLUSTER 5 - CUSTOMER CRM & HEALTH
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+skinparam entityFontSize 11
+skinparam entityAttributeFontSize 10
+skinparam nodesep 20
+skinparam ranksep 30
+
+title ERD Cluster 5: Customer CRM & Health\nPatient Profile, Medical Records & Medication Adherence
+
+' === COLUMN 1: CUSTOMER PROFILE ===
+entity "Customer" as CU {
+    * id <<PK>>
+    --
+    phone <<UNIQUE>>
+    email
+    password
+    full_name
+    address
+    verified
+}
+
+entity "CustomerHealthMetrics" as CHM {
+    * id <<PK>>
+    --
+    # customer_id <<FK, 1:1>>
+    gender
+    date_of_birth
+    blood_pressure
+    weight
+    height
+    bmi <<CALC>>
+    blood_type
+}
+
+entity "CustomerAllergy" as CAL {
+    * id <<PK>>
+    --
+    # customer_id <<FK>>
+    name
+    description
+}
+
+entity "CustomerHealthRecord" as CHR {
+    * id <<PK>>
+    --
+    # customer_id <<FK>>
+    record_type
+    title
+    date_recorded
+    provider_name
+    file_url
+}
+
+' === COLUMN 2: SHOPPING ===
+entity "CustomerCart" as CC {
+    * id <<PK>>
+    --
+    # customer_id <<FK, 1:1>>
+}
+
+entity "CartItem" as CI {
+    * id <<PK>>
+    --
+    # cart_id <<FK>>
+    # inventory_id <<FK>>
+    # unit_id <<FK>>
+    quantity
+    unit_price
+    total_price
+    is_selected
+}
+
+' === COLUMN 3: MEDICATION ADHERENCE ===
+entity "MedicineReminder" as MR {
+    * id <<PK>>
+    --
+    # customer_id <<FK>>
+    medicine_name
+    dosage
+    frequency_type
+    time
+    start_date
+    end_date
+    is_active
+}
+
+entity "ReminderNotification" as RN {
+    * id <<PK>>
+    --
+    # reminder_id <<FK>>
+    scheduled_time
+    status
+    sent_at
+    acknowledged_at
+}
+
+entity "ReminderLog" as RL {
+    * id <<PK>>
+    --
+    # reminder_id <<FK>>
+    # notification_id <<FK>>
+    # customer_id <<FK>>
+    action_type
+    scheduled_time
+    action_time
+}
+
+' === COLUMN 4: NOTIFICATIONS ===
+entity "CustomerNotification" as CN {
+    * id <<PK>>
+    --
+    # customer_id <<FK>>
+    type
+    title
+    message
+    is_read
+}
+
+entity "CustomerPushToken" as CPT {
+    * id <<PK>>
+    --
+    # customer_id <<FK>>
+    token <<UNIQUE>>
+    device_type
+    is_active
+}
+
+entity "StaffNotification" as SN {
+    * id <<PK>>
+    --
+    # staff_id <<FK>>
+    # pharmacy_id <<FK>>
+    type
+    title
+    message
+    is_read
+}
+
+' === NOTES ===
+note right of MR
+  **Frequency:**
+  daily | specific_days | interval
+end note
+
+note right of RL
+  **Action:**
+  taken | skipped | missed
+end note
+
+' === LAYOUT: 3 COLUMNS ===
+CU -[hidden]right-> CC
+CHM -[hidden]right-> CI
+CAL -[hidden]right-> MR
+CHR -[hidden]right-> RN
+CC -[hidden]right-> RL
+CI -[hidden]right-> CN
+
+CU -[hidden]down-> CHM
+CHM -[hidden]down-> CAL
+CAL -[hidden]down-> CHR
+CC -[hidden]down-> CI
+MR -[hidden]down-> RN
+RN -[hidden]down-> RL
+CN -[hidden]down-> CPT
+CPT -[hidden]down-> SN
+
+' === RELATIONSHIPS ===
+CU ||--o| CHM
+CU ||--o| CC
+CU ||--o{ CAL
+CU ||--o{ CHR
+CU ||--o{ MR
+CU ||--o{ CN
+CU ||--o{ CPT
+CU ||--o{ RL
+MR ||--o{ RN
+MR ||--o{ RL
+RN ||--o{ RL
+CC ||--o{ CI
+
+@enduml
+
+==================================================
+PART 3: LATEX DOCUMENTATION
+==================================================
+
+\subsubsection{Entity Relationship Diagram}
+
+The Entity Relationship Diagram (ERD) provides a comprehensive view of the PharmaEco database schema, illustrating the structure and relationships between data entities. The system employs a multi-tenant SaaS architecture with PostgreSQL as the underlying database, managed through Prisma ORM. The schema design prioritizes security, data integrity, and healthcare compliance requirements.
+
+Due to the complexity of the system comprising \textbf{thirty-two distinct entities}, the ERD is organized into five logical clusters for clarity:
+
+% === HIGH-LEVEL OVERVIEW ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/erd_overview.png}
+    \caption{High-Level Entity Relationship Diagram Overview}
+    \label{fig:erd_overview}
+\end{figure}
+
+Fig \ref{fig:erd_overview} presents a bird's-eye view of the entire database schema, showing the five major clusters and their key interconnections. Each cluster is detailed in the following subsections.
+
+% === CLUSTER 1 ===
+\paragraph{Cluster 1: Identity \& Access Management (IAM)}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=15cm]{images/erd_cluster1.png}
+    \caption{ERD Cluster 1: Identity \& Access Management}
+    \label{fig:erd_cluster1}
+\end{figure}
+
+Fig \ref{fig:erd_cluster1} illustrates the authentication and authorization infrastructure. This cluster contains seven security-critical entities:
+
+\begin{itemize}
+    \item \textbf{SystemAdmin}: Platform super-administrator with elevated administrative privileges. Attributes include primary key \texttt{id} (CUID), \texttt{email} (unique), \texttt{password} (bcrypt hashed), \texttt{name}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{Owner}: Pharmacy business owner representing the tenant root. Attributes include primary key \texttt{id}, \texttt{email} (unique), \texttt{password} (hashed), \texttt{name}, \texttt{phone}, \texttt{status} (PENDING/ACTIVE/SUSPENDED), \texttt{subscription\_expiry}, \texttt{is\_active} (Kill Switch flag), \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{Pharmacy}: Physical pharmacy branch representing the tenant unit. Attributes include primary key \texttt{id}, foreign key \texttt{owner\_id} (references Owner), \texttt{name}, \texttt{address}, \texttt{latitude}, \texttt{longitude} (geospatial indexing), \texttt{phone}, \texttt{email}, \texttt{hours} (JSON operating schedule), \texttt{service\_radius\_km}, \texttt{is\_active}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{PharmacyStaff}: Pharmacy employees with role-based access control. Attributes include primary key \texttt{id}, foreign key \texttt{pharmacy\_id} (references Pharmacy), \texttt{username}, \texttt{password} (hashed), \texttt{name}, \texttt{email} (unique), \texttt{role} (MANAGER/PHARMACIST/STAFF), \texttt{avatar}, \texttt{is\_active}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{RefreshToken}: JWT refresh tokens with polymorphic user relations enabling unified session management across all user types. Attributes include primary key \texttt{id}, \texttt{token} (unique, hashed), \texttt{expires\_at}, \texttt{revoked\_at}, \texttt{replaced\_by} (for token rotation chain), and optional foreign keys \texttt{owner\_id}, \texttt{staff\_id}, \texttt{customer\_id}, \texttt{admin\_id} (polymorphic pattern). This design enables the \textbf{Kill Switch} feature where \texttt{AdminService.globalBan()} instantly revokes all tokens for a user.
+    
+    \item \textbf{AuditLog}: Immutable forensic security audit trail. Attributes include primary key \texttt{id}, optional foreign key \texttt{pharmacy\_id}, \texttt{actor\_id}, \texttt{actor\_type} (SYSTEM\_ADMIN/OWNER/STAFF/SALES\_REP), \texttt{action} (CREATE/UPDATE/DELETE/LOGIN/LOGOUT/EXPORT/IMPORT/APPROVE/REJECT/SUSPEND/REACTIVATE), \texttt{resource}, \texttt{resource\_id}, \texttt{old\_data} (JSON snapshot), \texttt{new\_data} (JSON snapshot), \texttt{ip\_address}, \texttt{user\_agent}, \texttt{status}, \texttt{metadata}, and \texttt{created\_at} (immutable). No UPDATE or DELETE operations are permitted on this table, ensuring complete forensic traceability.
+    
+    \item \textbf{Otp}: One-Time Password verification codes with time-based expiration. Attributes include primary key \texttt{id}, \texttt{phone} (indexed), \texttt{otp} (hashed), \texttt{expires\_at}, \texttt{is\_used}, \texttt{created\_at}, and \texttt{updated\_at}.
+\end{itemize}
+
+The IAM cluster enforces multi-tenancy through the Owner → Pharmacy hierarchy, ensuring strict data isolation between tenants at the architectural level.
+
+% === CLUSTER 2 ===
+\paragraph{Cluster 2: Product Catalog \& Supplier Network}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=15cm]{images/erd_cluster2.png}
+    \caption{ERD Cluster 2: Product Catalog \& Supplier Network}
+    \label{fig:erd_cluster2}
+\end{figure}
+
+Fig \ref{fig:erd_cluster2} depicts the global medicine database and supplier ecosystem. This cluster manages the central product catalog with an approval workflow:
+
+\begin{itemize}
+    \item \textbf{Supplier}: Medicine suppliers and distributors. Attributes include primary key \texttt{id}, \texttt{name}, \texttt{contact\_info} (JSON), \texttt{address}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{PharmaSalesRep}: Supplier sales representatives with OTP-based authentication. Attributes include primary key \texttt{id}, foreign key \texttt{supplier\_id} (references Supplier), \texttt{name}, \texttt{email} (unique), \texttt{phone}, \texttt{is\_active}, \texttt{last\_otp} (hashed), \texttt{otp\_expires\_at}, \texttt{is\_verified}, \texttt{created\_at}, and \texttt{updated\_at}. The CSV upload functionality includes \textbf{injection sanitization} that strips dangerous formula prefixes (=, +, -, @, \textbackslash t, \textbackslash r) to prevent Excel macro attacks.
+    
+    \item \textbf{GlobalMedicineCatalog}: Central medicine registry with approval workflow. Attributes include primary key \texttt{id}, \texttt{name} (indexed), \texttt{manufacturer}, \texttt{description}, \texttt{packaging}, \texttt{active\_ingredient}, \texttt{barcode}, foreign keys \texttt{category\_id}, \texttt{brand\_id}, \texttt{supplier\_id}, \texttt{pharma\_rep\_id}, \texttt{unit\_price}, \texttt{status} (PENDING/APPROVED/REJECTED), \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{Category}: Medicine categories for classification. Attributes include primary key \texttt{id}, \texttt{name} (unique), \texttt{description}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{Brand}: Pharmaceutical brands with manufacturer information. Attributes include primary key \texttt{id}, \texttt{name} (unique), \texttt{manufacturer}, \texttt{country}, \texttt{logo}, \texttt{image\_public\_id}, \texttt{description}, \texttt{created\_at}, and \texttt{updated\_at}.
+\end{itemize}
+
+% === CLUSTER 3 ===
+\paragraph{Cluster 3: Inventory \& Procurement}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=15cm]{images/erd_cluster3.png}
+    \caption{ERD Cluster 3: Inventory \& Procurement}
+    \label{fig:erd_cluster3}
+\end{figure}
+
+Fig \ref{fig:erd_cluster3} illustrates the stock management system with FIFO/FEFO batch tracking:
+
+\begin{itemize}
+    \item \textbf{PharmacyInventory}: Local pharmacy stock items. Attributes include primary key \texttt{id}, foreign key \texttt{pharmacy\_id} (references Pharmacy), optional foreign key \texttt{global\_catalog\_id} (references GlobalMedicineCatalog), \texttt{name}, \texttt{description}, \texttt{image}, foreign keys \texttt{category\_id}, \texttt{brand\_id}, \texttt{storage\_location\_id}, \texttt{total\_stock\_level}, \texttt{min\_stock\_level}, \texttt{is\_active}, \texttt{is\_deleted} (soft delete pattern), \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{InventoryBatch}: Stock batches with expiry tracking for FIFO/FEFO logic. Attributes include primary key \texttt{id}, foreign key \texttt{inventory\_id} (references PharmacyInventory with CASCADE delete), \texttt{batch\_code}, \texttt{expiry\_date} (indexed for FEFO queries), \texttt{stock\_quantity}, \texttt{purchase\_price} (critical for COGS calculation), \texttt{purchase\_date}, \texttt{is\_deleted} (soft delete), \texttt{created\_at}, and \texttt{updated\_at}. The composite index on \texttt{(inventory\_id, is\_deleted, stock\_quantity, expiry\_date)} optimizes FIFO deduction queries.
+    
+    \item \textbf{InventoryUnit}: Selling units with price tiers and conversion factors. Attributes include primary key \texttt{id}, foreign key \texttt{inventory\_id} (CASCADE), \texttt{name}, \texttt{conversion\_factor}, \texttt{price}, \texttt{is\_base\_unit}, \texttt{is\_default\_selling}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{StorageLocation}: Warehouse storage locations within a pharmacy. Attributes include primary key \texttt{id}, foreign key \texttt{pharmacy\_id}, \texttt{name}, \texttt{description}, \texttt{is\_active}, \texttt{created\_at}, and \texttt{updated\_at}. Unique constraint on \texttt{(pharmacy\_id, name)}.
+    
+    \item \textbf{PurchaseInvoice}: Purchase orders from suppliers. Attributes include primary key \texttt{id}, foreign key \texttt{pharmacy\_id}, optional foreign key \texttt{supplier\_id}, \texttt{supplier\_name}, \texttt{invoice\_number}, \texttt{invoice\_date}, \texttt{total\_amount}, \texttt{status} (PENDING/CONFIRMED/CANCELLED), \texttt{notes}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{PurchaseItem}: Purchase order line items. Attributes include primary key \texttt{id}, foreign key \texttt{purchase\_invoice\_id} (CASCADE), foreign key \texttt{inventory\_id}, \texttt{batch\_code}, \texttt{expiry\_date}, \texttt{quantity}, \texttt{unit\_price}, \texttt{total\_price}, \texttt{created\_at}, and \texttt{updated\_at}.
+\end{itemize}
+
+The \textbf{soft delete pattern} (\texttt{is\_deleted} flag) preserves referential integrity for historical orders, supporting audit requirements and potential data recovery.
+
+% === CLUSTER 4 ===
+\paragraph{Cluster 4: Order-to-Cash \& Financial}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=15cm]{images/erd_cluster4.png}
+    \caption{ERD Cluster 4: Order-to-Cash \& Financial}
+    \label{fig:erd_cluster4}
+\end{figure}
+
+Fig \ref{fig:erd_cluster4} depicts the sales transaction lifecycle with a critical security feature—\textbf{Snapshot Pricing}:
+
+\begin{itemize}
+    \item \textbf{PharmacyOrder}: Customer sales orders. Attributes include primary key \texttt{id}, foreign key \texttt{pharmacy\_id}, foreign key \texttt{customer\_id}, \texttt{order\_number} (unique), \texttt{status} (PENDING/CONFIRMED/PREPARING/OUT\_FOR\_DELIVERY/DELIVERED/CANCELLED), \texttt{subtotal}, \texttt{delivery\_fee}, \texttt{total\_amount}, \texttt{shipping\_address}, \texttt{note}, \texttt{payment\_method}, \texttt{payment\_status} (PENDING/PAID/REFUNDED/FAILED), \texttt{created\_at} (indexed), and \texttt{updated\_at}.
+    
+    \item \textbf{OrderItem}: Order line items with immutable cost snapshot. Attributes include primary key \texttt{id}, foreign key \texttt{order\_id} (CASCADE), foreign key \texttt{inventory\_id}, optional foreign key \texttt{unit\_id}, \texttt{quantity}, \texttt{price} (selling price), \textbf{\texttt{cost\_price}} (FIFO cost captured at transaction time—\textbf{IMMUTABLE}), \texttt{created\_at}, and \texttt{updated\_at}. The \texttt{cost\_price} field is critical for accurate Profit \& Loss calculations: Gross Profit = $\sum$(price - cost\_price). This value survives batch deletion, ensuring accounting integrity.
+    
+    \item \textbf{PharmacyInvoice}: Sales invoices generated from orders. Attributes include primary key \texttt{id}, foreign key \texttt{pharmacy\_id}, foreign key \texttt{customer\_id}, optional foreign key \texttt{order\_id} (unique), \texttt{invoice\_number} (unique), \texttt{invoice\_date}, \texttt{total\_amount}, \texttt{type} (ONLINE/OFFLINE), \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{InvoiceItem}: Invoice line items. Attributes include primary key \texttt{id}, foreign key \texttt{invoice\_id} (CASCADE), optional foreign key \texttt{inventory\_id}, \texttt{quantity}, \texttt{price}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{Payment}: Payment transaction records. Attributes include primary key \texttt{id}, foreign key \texttt{order\_id} (unique), \texttt{amount}, \texttt{payment\_method}, \texttt{status}, \texttt{transaction\_id}, \texttt{paid\_at}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{Delivery}: Order fulfillment and tracking. Attributes include primary key \texttt{id}, foreign key \texttt{order\_id} (unique), foreign key \texttt{pharmacy\_id}, \texttt{delivery\_service}, \texttt{delivery\_fee}, \texttt{status} (PENDING/PICKED\_UP/IN\_TRANSIT/DELIVERED/FAILED), \texttt{tracking\_url}, optional foreign key \texttt{delivery\_staff\_id}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{PharmacyAnalytics}: Pre-computed daily revenue aggregates (materialized view pattern). Attributes include primary key \texttt{id}, foreign key \texttt{pharmacy\_id}, \texttt{date} (unique with pharmacy\_id), \texttt{total\_revenue}, \texttt{total\_orders}, \texttt{total\_customers}, \texttt{average\_order\_value}, \texttt{total\_profit} (derived from OrderItem.cost\_price), \texttt{created\_at}, and \texttt{updated\_at}. Background workers update this table asynchronously for optimized dashboard queries.
+\end{itemize}
+
+% === CLUSTER 5 ===
+\paragraph{Cluster 5: Customer CRM \& Health}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{images/erd_cluster5.png}
+    \caption{ERD Cluster 5: Customer CRM \& Health}
+    \label{fig:erd_cluster5}
+\end{figure}
+
+Fig \ref{fig:erd_cluster5} illustrates the customer-centric design with health data management and medication adherence tracking. This cluster contains twelve entities handling sensitive patient information:
+
+\begin{itemize}
+    \item \textbf{Customer}: Patient/customer profile serving as the health data hub. Attributes include primary key \texttt{id}, \texttt{phone} (unique, indexed), \texttt{email}, \texttt{password} (bcrypt hashed), \texttt{full\_name}, \texttt{address}, \texttt{verified}, \texttt{verified\_at}, \texttt{registration\_source}, \texttt{created\_at}, and \texttt{updated\_at}. Privacy-sensitive data is protected through encryption at rest.
+    
+    \item \textbf{CustomerHealthMetrics}: Health vitals with 1:1 relationship to Customer. Attributes include primary key \texttt{id}, foreign key \texttt{customer\_id} (unique), \texttt{gender}, \texttt{date\_of\_birth}, \texttt{blood\_pressure\_systolic}, \texttt{blood\_pressure\_diastolic}, \texttt{weight}, \texttt{height}, \texttt{bmi} (calculated), \texttt{bmr} (calculated), \texttt{blood\_type}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{CustomerAllergy}: Allergy records for drug interaction warnings. Attributes include primary key \texttt{id}, foreign key \texttt{customer\_id}, \texttt{name}, \texttt{description}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{CustomerHealthRecord}: Medical documents and records. Attributes include primary key \texttt{id}, foreign key \texttt{customer\_id}, \texttt{record\_type}, \texttt{title}, \texttt{description}, \texttt{date\_recorded}, \texttt{provider\_name}, \texttt{file\_url}, \texttt{image\_public\_id}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{CustomerCart}: Shopping cart with 1:1 relationship to Customer. Attributes include primary key \texttt{id}, foreign key \texttt{customer\_id} (unique), \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{CartItem}: Cart line items. Attributes include primary key \texttt{id}, foreign key \texttt{cart\_id} (CASCADE), foreign key \texttt{inventory\_id}, optional foreign key \texttt{unit\_id}, \texttt{quantity}, \texttt{unit\_price}, \texttt{total\_price}, \texttt{is\_selected}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{MedicineReminder}: Medication reminder schedules. Attributes include primary key \texttt{id}, foreign key \texttt{customer\_id}, \texttt{medicine\_name}, \texttt{dosage}, \texttt{frequency\_type} (daily/specific\_days/interval), \texttt{specific\_days} (JSON), \texttt{interval\_days}, \texttt{time} (indexed), \texttt{start\_date}, \texttt{end\_date}, \texttt{is\_active}, \texttt{notes}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{ReminderNotification}: Push notification records. Attributes include primary key \texttt{id}, foreign key \texttt{reminder\_id}, \texttt{scheduled\_time} (indexed), \texttt{status} (PENDING/SENT/DELIVERED/ACKNOWLEDGED/FAILED), \texttt{push\_notification\_id}, \texttt{sent\_at}, \texttt{acknowledged\_at}, \texttt{error\_message}, and \texttt{created\_at}.
+    
+    \item \textbf{ReminderLog}: Adherence tracking logs for medication compliance. Attributes include primary key \texttt{id}, foreign key \texttt{reminder\_id}, optional foreign key \texttt{notification\_id}, foreign key \texttt{customer\_id}, \texttt{medicine\_name}, \texttt{dosage}, \texttt{action\_type} (taken/skipped/missed), \texttt{scheduled\_time}, \texttt{action\_time}, \texttt{notes}, and \texttt{created\_at}. Adherence Rate = taken / (taken + missed).
+    
+    \item \textbf{CustomerNotification}: General customer notifications. Attributes include primary key \texttt{id}, foreign key \texttt{customer\_id}, \texttt{type} (ORDER\_STATUS\_CHANGED/DELIVERY\_UPDATE/MEDICINE\_REMINDER), \texttt{title}, \texttt{message}, \texttt{metadata} (JSON), \texttt{is\_read}, \texttt{push\_sent}, \texttt{push\_sent\_at}, \texttt{created\_at}, and \texttt{updated\_at}.
+    
+    \item \textbf{CustomerPushToken}: Expo push notification tokens for mobile devices. Attributes include primary key \texttt{id}, foreign key \texttt{customer\_id}, \texttt{token} (unique), \texttt{device\_type}, \texttt{device\_id}, \texttt{is\_active}, \texttt{created\_at}, and \texttt{updated\_at}. Supports multiple devices per user.
+    
+    \item \textbf{StaffNotification}: Staff alert notifications. Attributes include primary key \texttt{id}, foreign key \texttt{staff\_id}, foreign key \texttt{pharmacy\_id}, \texttt{type} (ORDER\_NEW/ORDER\_DELETED/CATALOG\_IMPORTED/INVENTORY\_LOW\_STOCK/INVENTORY\_EXPIRY\_ALERT/PAYMENT\_RECEIVED/SYSTEM\_ALERT/STAFF\_BANNED), \texttt{title}, \texttt{message}, \texttt{metadata} (JSON), \texttt{is\_read}, \texttt{created\_at}, and \texttt{updated\_at}. The \texttt{STAFF\_BANNED} type is triggered by the Kill Switch feature.
+\end{itemize}
+
+% === SUMMARY TABLE ===
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|p{5.5cm}|p{4.5cm}|}
+\hline
+\textbf{Cluster} & \textbf{Entities} & \textbf{Security Focus} & \textbf{Scaling Strategy} \\ \hline
+1. Identity \& Access Management & 7 & Multi-tenancy isolation, Kill Switch, Token rotation, Immutable audit logs & Horizontally scalable via CUID and stateless JWT design \\ \hline
+2. Product Catalog \& Supplier & 5 & Approval workflow, CSV injection sanitization, OTP authentication & Horizontally scalable via CUID, centralized catalog with distributed cache \\ \hline
+3. Inventory \& Procurement & 6 & Soft delete pattern, FIFO/FEFO indexing, Cascade delete constraints & Horizontally scalable via CUID, partitioned by pharmacy\_id \\ \hline
+4. Order-to-Cash \& Financial & 7 & Snapshot pricing (immutable COGS), Server-side price validation & Horizontally scalable via CUID, async analytics materialization \\ \hline
+5. Customer CRM \& Health & 12 & Password hashing, Phone verification, Health data encryption & Horizontally scalable via CUID and stateless design \\ \hline
+\textbf{Total} & \textbf{32} & & \\ \hline
+\end{tabular}
+\caption{ERD Clusters Summary with Security Focus and Scaling Strategy}
+\label{tab:erd_clusters}
+\end{table}
+
+The database schema demonstrates a security-first design philosophy with multiple layers of protection: tenant isolation at the architectural level, immutable audit trails for forensic investigation, snapshot pricing for financial integrity, and comprehensive authentication mechanisms including OTP verification and JWT token rotation with reuse detection.
+
+==================================================
+END OF DOCUMENT
+==================================================

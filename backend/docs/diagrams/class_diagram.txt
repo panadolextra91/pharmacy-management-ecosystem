@@ -1,0 +1,1727 @@
+==================================================
+CLASS DIAGRAM DOCUMENTATION
+Pharmacy Management System (Codename: PharmaEco)
+==================================================
+
+==================================================
+PART 1: CLASS DIAGRAM DESCRIPTION / MÔ TẢ CLASS DIAGRAM
+==================================================
+
+## 1.1 Overview
+
+The PharmaEco system's class diagram contains **32 distinct entity classes** representing the database schema, along with **12 service classes** implementing business logic following Clean Architecture principles. The classes are organized into logical groupings based on their domain responsibilities.
+
+---
+
+## 1.2 Entity Classes (Data Models)
+
+### 1.2.1 Authentication & Access Control (5 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **SystemAdmin** | id, email, password, name, createdAt, updatedAt | Platform super-user with God Mode access |
+| **Owner** | id, email, password, name, phone, status (PENDING/ACTIVE/SUSPENDED), subscriptionExpiry, isActive, createdAt, updatedAt | Pharmacy business owner (Tenant) |
+| **PharmacyStaff** | id, pharmacyId, username, password, name, email, role (MANAGER/PHARMACIST/STAFF), avatar, avatarPublicId, isActive, createdAt, updatedAt | Pharmacy employees |
+| **Customer** | id, phone, email, password, fullName, address, verified, verifiedAt, registrationSource, createdAt, updatedAt | End consumers (Mobile app users) |
+| **RefreshToken** | id, token, expiresAt, createdAt, revokedAt, replacedBy, ownerId?, staffId?, customerId?, adminId? | JWT refresh token with polymorphic relations for token rotation |
+
+### 1.2.2 Pharmacy & Multi-Tenancy (3 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **Pharmacy** | id, ownerId, name, address, latitude, longitude, phone, email, hours (JSON), serviceRadius, isActive, createdAt, updatedAt | Physical pharmacy branch |
+| **StorageLocation** | id, pharmacyId, name, description, isActive, createdAt, updatedAt | Warehouse storage locations |
+| **PharmacyAnalytics** | id, pharmacyId, date, totalRevenue, totalOrders, totalCustomers, averageOrderValue, total_profit, createdAt, updatedAt | Daily aggregated analytics |
+
+### 1.2.3 Global Catalog & Suppliers (4 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **GlobalMedicineCatalog** | id, name, manufacturer, description, packaging, activeIngredient, barcode, categoryId, brandId, supplierId, pharmaRepId, unitPrice, status (PENDING/APPROVED/REJECTED), createdAt, updatedAt | Central medicine database |
+| **Supplier** | id, name, contactInfo (JSON), address, createdAt, updatedAt | Medicine suppliers/distributors |
+| **PharmaSalesRep** | id, name, email, phone, supplierId, isActive, lastOtp, otpExpiresAt, isVerified, createdAt, updatedAt | Supplier sales representatives with OTP auth |
+| **Category** | id, name, description, createdAt, updatedAt | Medicine categories (e.g., Antibiotics, Painkillers) |
+| **Brand** | id, name, manufacturer, country, logo, imagePublicId, description, createdAt, updatedAt | Pharmaceutical brands |
+
+### 1.2.4 Inventory Management (4 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **PharmacyInventory** | id, pharmacyId, globalCatalogId, name, description, image, imagePublicId, categoryId, brandId, storageLocationId, totalStockLevel, minStockLevel, isActive, isDeleted, createdAt, updatedAt | Local pharmacy stock items |
+| **InventoryBatch** | id, inventoryId, batchCode, expiryDate, stockQuantity, purchasePrice, purchaseDate, isDeleted, createdAt, updatedAt | Stock batches with expiry tracking (FIFO/FEFO) |
+| **InventoryUnit** | id, inventoryId, name, conversionFactor, price, isBaseUnit, isDefaultSelling, createdAt, updatedAt | Selling units (Box, Strip, Pill) with price |
+| **PurchaseInvoice** | id, pharmacyId, supplierId, supplierName, invoiceNumber, invoiceDate, totalAmount, status (PENDING/CONFIRMED/CANCELLED), notes, createdAt, updatedAt | Purchase records from suppliers |
+| **PurchaseItem** | id, purchaseInvoiceId, inventoryId, batchCode, expiryDate, quantity, unitPrice, totalPrice, createdAt, updatedAt | Line items in purchase invoices |
+
+### 1.2.5 Sales & Orders (6 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **PharmacyOrder** | id, pharmacyId, customerId, orderNumber, status (PENDING/CONFIRMED/PREPARING/OUT_FOR_DELIVERY/DELIVERED/CANCELLED), subtotal, deliveryFee, totalAmount, shippingAddress, note, paymentMethod, paymentStatus, createdAt, updatedAt | Customer orders |
+| **OrderItem** | id, orderId, inventoryId, unitId, quantity, price, costPrice (snapshot), createdAt, updatedAt | Line items with frozen cost for P&L |
+| **PharmacyInvoice** | id, pharmacyId, customerId, orderId, invoiceNumber, invoiceDate, totalAmount, type (ONLINE/OFFLINE), createdAt, updatedAt | Sales invoices |
+| **InvoiceItem** | id, invoiceId, inventoryId, quantity, price, createdAt, updatedAt | Invoice line items |
+| **Payment** | id, orderId, amount, paymentMethod, status, transactionId, paidAt, createdAt, updatedAt | Payment records |
+| **Delivery** | id, orderId, pharmacyId, deliveryService, deliveryServiceOrderId, deliveryFee, estimatedDeliveryTime, actualDeliveryTime, status, deliveryPersonName, deliveryPersonPhone, trackingUrl, deliveryStaffId, createdAt, updatedAt | Delivery tracking |
+
+### 1.2.6 Customer Health & Cart (6 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **CustomerHealthMetrics** | id, customerId, gender, dateOfBirth, bloodPressureSystolic, bloodPressureDiastolic, weight, height, bmi, bmr, bloodType, createdAt, updatedAt | Health vitals (1:1 with Customer) |
+| **CustomerHealthRecord** | id, customerId, recordType, title, description, dateRecorded, providerName, fileUrl, imagePublicId, createdAt, updatedAt | Medical records/documents |
+| **CustomerAllergy** | id, customerId, name, description, createdAt, updatedAt | Allergy tracking |
+| **CustomerCart** | id, customerId, createdAt, updatedAt | Shopping cart (1:1 with Customer) |
+| **CartItem** | id, cartId, inventoryId, unitId, quantity, unitPrice, totalPrice, isSelected, createdAt, updatedAt | Cart items |
+
+### 1.2.7 Medicine Reminders (3 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **MedicineReminder** | id, customerId, medicineName, dosage, frequencyType, specificDays (JSON), intervalDays, time, startDate, endDate, isActive, notes, createdAt, updatedAt | Reminder schedule configuration |
+| **ReminderNotification** | id, reminderId, scheduledTime, status (PENDING/SENT/DELIVERED/ACKNOWLEDGED/FAILED), pushNotificationId, sentAt, acknowledgedAt, errorMessage, createdAt | Push notification records |
+| **ReminderLog** | id, reminderId, notificationId, customerId, medicineName, dosage, actionType (taken/skipped/missed), scheduledTime, actionTime, notes, createdAt | Adherence tracking logs |
+
+### 1.2.8 Notifications (3 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **StaffNotification** | id, staffId, pharmacyId, type, title, message, metadata (JSON), isRead, createdAt, updatedAt | Staff alerts (Orders, Inventory, System) |
+| **CustomerNotification** | id, customerId, type, title, message, metadata (JSON), isRead, pushSent, pushSentAt, createdAt, updatedAt | Customer notifications |
+| **CustomerPushToken** | id, customerId, token, deviceType, deviceId, isActive, createdAt, updatedAt | Expo push tokens per device |
+
+### 1.2.9 Security & Audit (2 Classes)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **AuditLog** | id, pharmacyId, actorId, actorType, action, resource, resourceId, oldData (JSON), newData (JSON), ipAddress, userAgent, status, metadata, createdAt | **Forensic audit trail** - Records every sensitive operation for security investigation |
+| **Otp** | id, phone, otp, expiresAt, isUsed, createdAt, updatedAt | OTP verification codes |
+
+**AuditLog Actions (Comprehensive Monitoring):**
+| Action | Description |
+|--------|-------------|
+| `LOGIN` | User authentication attempts |
+| `LOGOUT` | Session termination |
+| `CREATE` | New record creation |
+| `UPDATE` | Record modification |
+| `DELETE` | Record removal (soft/hard) |
+| `EXPORT` | **Data export operations** - Critical for compliance & data leak detection |
+| `IMPORT` | Bulk data import (CSV catalog) |
+| `APPROVE` | Catalog/Owner approval |
+| `REJECT` | Approval rejection |
+| `SUSPEND` | **Account suspension** - Kill Switch triggered |
+| `REACTIVATE` | Account restoration after suspension |
+
+### 1.2.10 Content (1 Class)
+
+| Class | Attributes | Description |
+|-------|-----------|-------------|
+| **News** | id, title, category, content, image, imagePublicId, readingTime, summary, isFeatured, createdAt, updatedAt | Health news articles |
+
+---
+
+## 1.3 Service Classes (Business Logic)
+
+Following Clean Architecture, each module has a Service class containing business logic. Here are the main services with their methods:
+
+### AuthService (Access Control)
+| Method | Description |
+|--------|-------------|
+| `registerOwner(data)` | Register new pharmacy owner |
+| `loginOwner(data)` | Owner authentication |
+| `registerStaff(data, pharmacyId)` | Create staff account |
+| `loginStaff(data)` | Staff authentication |
+| `registerCustomer(data)` | Customer registration |
+| `loginCustomer(data)` | Customer auth (OTP/Password) |
+| `sendOtp(phone)` | Generate and send OTP |
+| `verifyOtp(phone, otp)` | Verify OTP code |
+| `refreshToken(token)` | Token rotation with reuse detection |
+| `logout(refreshToken)` | Revoke token |
+| `changePassword(userId, role, oldPwd, newPwd)` | Change password + revoke all sessions |
+| `revokeAllSessions(userId, role)` | **Kill Switch Core** - Revoke all refresh tokens for a user |
+
+### AdminService (System Administration) ⚡ GOD MODE ⚡
+| Method | Description |
+|--------|-------------|
+| `globalBan(userId, userType)` | **🔴 NÚT BẤM TỬ THẦN (Death Button)** - Instantly suspends any user (Owner/Staff), revokes ALL active sessions, and triggers real-time Discord alert. The user is immediately locked out across all devices. |
+| `reactivateUser(userId, userType)` | Restore suspended user access |
+| `listPendingOwners()` | Get owners awaiting approval |
+| `approveOwner(ownerId)` | Approve pending owner registration |
+| `listAllOwners(query)` | Browse all tenants |
+| `exportData(options)` | Export system data (audit logged) |
+| `getAuditLogs(query)` | View forensic audit trail |
+
+### InventoryService
+| Method | Description |
+|--------|-------------|
+| `create(data)` | Create inventory item with units |
+| `findAll(query)` | List inventory with pagination |
+| `findById(id, pharmacyId)` | Get item details |
+| `update(id, pharmacyId, data)` | Update item info |
+| `addStock(inventoryId, pharmacyId, data, tx?)` | Add stock batch (FIFO) |
+| `deductStock(inventoryId, pharmacyId, qty, tx?)` | Deduct stock (FIFO/FEFO) |
+| `getExpiryAlerts(pharmacyId, days)` | Get expiring batches |
+| `getLowStockAlerts(pharmacyId)` | Get low stock items |
+| `delete(id, pharmacyId)` | Soft delete item |
+
+### SalesService
+| Method | Description |
+|--------|-------------|
+| `createOrder(data)` | Create order with server-side pricing |
+| `getOldestBatchCost(inventoryId)` | FIFO cost snapshot |
+| `getReceipt(invoiceId, pharmacyId)` | Generate receipt data |
+
+### CustomerService
+| Method | Description |
+|--------|-------------|
+| `searchCustomers(query)` | Search by name/phone |
+| `createCustomer(data)` | Register new customer |
+| `getCustomerProfile(id, pharmacyId)` | Get profile + orders |
+| `addHealthMetric(customerId, data)` | Upsert health vitals |
+| `addAllergy(customerId, data)` | Add allergy record |
+| `deleteAllergy(customerId, allergyId)` | Remove allergy |
+| `addHealthRecord(customerId, data)` | Add medical record |
+| `deleteHealthRecord(customerId, recordId)` | Remove record |
+| `getMe(customerId)` | Portal: Get own profile |
+| `updateMe(customerId, data)` | Portal: Update profile |
+| `getGlobalHistory(customerId)` | Portal: Cross-pharmacy orders |
+
+### CatalogService
+| Method | Description |
+|--------|-------------|
+| `create(data)` | Add medicine to catalog |
+| `findAll(query)` | Browse catalog |
+| `findById(id)` | Get medicine details |
+| `update(id, data)` | Update medicine |
+| `delete(id)` | Remove from catalog |
+| `processCatalogCsv(buffer, supplierId, repId)` | **Bulk CSV import with CSV injection sanitization** - Strips dangerous formulas (`=`, `+`, `-`, `@`, `\t`, `\r`) from cell values to prevent Excel macro attacks. Uses `normalizeName()` for consistent data. |
+| `notifyNewCatalog(supplierId, count)` | Notify owners of new items |
+| `getPendingItems()` | Get items pending approval |
+| `approveCatalogItems(ids)` | Approve pending items |
+| `sendPurchaseRequest(data)` | Email purchase request to reps |
+
+### ReminderService
+| Method | Description |
+|--------|-------------|
+| `createReminder(customerId, data)` | Create medicine reminder |
+| `getMyReminders(customerId, query)` | List reminders |
+| `getReminderById(customerId, id)` | Get reminder details |
+| `updateReminder(customerId, id, data)` | Update reminder |
+| `deleteReminder(customerId, id)` | Delete reminder |
+| `logAction(customerId, id, data)` | Log taken/skipped/missed |
+| `getAdherenceHistory(customerId)` | Get adherence logs |
+
+### AnalyticsService
+| Method | Description |
+|--------|-------------|
+| `getDashboardStats(pharmacyId)` | Today's stats + widgets |
+| `getRevenueChart(pharmacyId, days)` | Revenue chart data |
+| `getProfitLoss(pharmacyId, start, end)` | P&L report |
+| `getTopSelling(pharmacyId, limit)` | Top selling items |
+| `getInventoryValuation(pharmacyId)` | Warehouse value |
+
+### StaffNotificationService
+| Method | Description |
+|--------|-------------|
+| `notifyPharmacy(pharmacyId, type, title, msg, meta?, roles?)` | Notify staff by roles |
+| `markAsRead(notificationId, staffId, pharmacyId)` | Mark notification read |
+| `markAllAsRead(staffId, pharmacyId)` | Mark all read |
+| `getUnreadCount(staffId, pharmacyId)` | Badge count |
+| `getNotifications(staffId, pharmacyId, page, limit, isRead?)` | List notifications |
+
+---
+
+## 1.4 Class Relationships
+
+### Multi-Tenancy Hub: **Owner → Pharmacy → All Operations**
+- One Owner has Many Pharmacies (1-N)
+- One Pharmacy has Many Staff, Inventory, Orders, Invoices, Notifications (1-N)
+
+### Customer as Central Health Hub
+- Customer ↔ CustomerHealthMetrics (1:1)
+- Customer ↔ CustomerCart (1:1)
+- Customer → CustomerAllergy (1-N)
+- Customer → CustomerHealthRecord (1-N)
+- Customer → MedicineReminder (1-N)
+- Customer → PharmacyOrder (1-N) - Cross-pharmacy orders
+
+### Inventory with Batch Tracking
+- PharmacyInventory → InventoryBatch (1-N) - FIFO batches
+- PharmacyInventory → InventoryUnit (1-N) - Selling units with prices
+- PharmacyInventory ← GlobalMedicineCatalog (N:1) - Optional link to global catalog
+
+### Sales Hierarchy
+- PharmacyOrder → OrderItem (1-N) - Order line items
+- PharmacyOrder ↔ PharmacyInvoice (1:1) - Invoice per order
+- PharmacyOrder ↔ Payment (1:1) - Payment record
+- PharmacyOrder ↔ Delivery (1:1) - Delivery tracking
+- OrderItem → costPrice - Immutable COGS snapshot
+
+### Medicine Reminder Cascade
+- MedicineReminder → ReminderNotification (1-N) - Scheduled notifications
+- ReminderNotification → ReminderLog (1-N) - Adherence logs
+- MedicineReminder → ReminderLog (1-N) - Direct logs
+
+### Supplier Ecosystem
+- Supplier → PharmaSalesRep (1-N) - Sales representatives
+- Supplier → GlobalMedicineCatalog (1-N) - Catalog items
+- PharmaSalesRep → GlobalMedicineCatalog (1-N) - Items uploaded by rep
+
+### Polymorphic RefreshToken
+- RefreshToken → Owner? (N:1) - Optional
+- RefreshToken → PharmacyStaff? (N:1) - Optional
+- RefreshToken → Customer? (N:1) - Optional
+- RefreshToken → SystemAdmin? (N:1) - Optional
+
+==================================================
+PART 2: PLANTUML CLASS DIAGRAM
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam classAttributeFontSize 9
+skinparam defaultFontName Segoe UI
+skinparam linetype ortho
+skinparam groupInheritance 2
+
+title Class Diagram - Pharmacy Management System (PharmaEco)\n32 Entity Classes + Service Classes
+
+' === ENUMS ===
+enum OwnerStatus {
+    PENDING
+    ACTIVE
+    SUSPENDED
+}
+
+enum StaffRole {
+    MANAGER
+    PHARMACIST
+    STAFF
+}
+
+enum OrderStatus {
+    PENDING
+    CONFIRMED
+    PREPARING
+    OUT_FOR_DELIVERY
+    DELIVERED
+    CANCELLED
+}
+
+enum PaymentStatus {
+    PENDING
+    PAID
+    REFUNDED
+    FAILED
+}
+
+enum CatalogStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
+
+enum NotificationStatus {
+    PENDING
+    SENT
+    DELIVERED
+    ACKNOWLEDGED
+    FAILED
+}
+
+' === AUTHENTICATION & ACCESS CONTROL ===
+package "Authentication & Access Control" #E3F2FD {
+    
+    class SystemAdmin {
+        +id: String
+        +email: String
+        +password: String
+        +name: String
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class Owner {
+        +id: String
+        +email: String
+        +password: String
+        +name: String
+        +phone: String?
+        +status: OwnerStatus
+        +subscriptionExpiry: DateTime?
+        +isActive: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class PharmacyStaff {
+        +id: String
+        +pharmacyId: String
+        +username: String
+        +password: String
+        +name: String
+        +email: String
+        +role: StaffRole
+        +avatar: String?
+        +isActive: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class Customer {
+        +id: String
+        +phone: String
+        +email: String?
+        +password: String?
+        +fullName: String?
+        +address: String?
+        +verified: Boolean
+        +verifiedAt: DateTime?
+        +registrationSource: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class RefreshToken {
+        +id: String
+        +token: String
+        +expiresAt: DateTime
+        +createdAt: DateTime
+        +revokedAt: DateTime?
+        +replacedBy: String?
+        +ownerId: String?
+        +staffId: String?
+        +customerId: String?
+        +adminId: String?
+    }
+}
+
+' === PHARMACY MANAGEMENT ===
+package "Pharmacy & Multi-Tenancy" #FFF3E0 {
+    
+    class Pharmacy {
+        +id: String
+        +ownerId: String
+        +name: String
+        +address: String
+        +latitude: Float
+        +longitude: Float
+        +phone: String
+        +email: String?
+        +hours: Json
+        +serviceRadius: Float
+        +isActive: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class StorageLocation {
+        +id: String
+        +pharmacyId: String
+        +name: String
+        +description: String?
+        +isActive: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+}
+
+' === GLOBAL CATALOG ===
+package "Global Catalog & Suppliers" #F3E5F5 {
+    
+    class GlobalMedicineCatalog {
+        +id: String
+        +name: String
+        +manufacturer: String?
+        +description: String?
+        +packaging: String?
+        +activeIngredient: String?
+        +barcode: String?
+        +categoryId: String?
+        +brandId: String?
+        +supplierId: String
+        +pharmaRepId: String
+        +unitPrice: Decimal?
+        +status: CatalogStatus
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class Supplier {
+        +id: String
+        +name: String
+        +contactInfo: Json
+        +address: String
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class PharmaSalesRep {
+        +id: String
+        +name: String
+        +email: String
+        +phone: String
+        +supplierId: String
+        +isActive: Boolean
+        +lastOtp: String?
+        +otpExpiresAt: DateTime?
+        +isVerified: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class Category {
+        +id: String
+        +name: String
+        +description: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class Brand {
+        +id: String
+        +name: String
+        +manufacturer: String?
+        +country: String?
+        +logo: String?
+        +description: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+}
+
+' === INVENTORY ===
+package "Inventory Management" #E8F5E9 {
+    
+    class PharmacyInventory {
+        +id: String
+        +pharmacyId: String
+        +globalCatalogId: String?
+        +name: String
+        +description: String?
+        +image: String?
+        +categoryId: String?
+        +brandId: String?
+        +storageLocationId: String?
+        +totalStockLevel: Int
+        +minStockLevel: Int
+        +isActive: Boolean
+        +isDeleted: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class InventoryBatch {
+        +id: String
+        +inventoryId: String
+        +batchCode: String
+        +expiryDate: DateTime
+        +stockQuantity: Int
+        +purchasePrice: Decimal?
+        +purchaseDate: DateTime?
+        +isDeleted: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class InventoryUnit {
+        +id: String
+        +inventoryId: String
+        +name: String
+        +conversionFactor: Int
+        +price: Decimal
+        +isBaseUnit: Boolean
+        +isDefaultSelling: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class PurchaseInvoice {
+        +id: String
+        +pharmacyId: String
+        +supplierId: String?
+        +supplierName: String?
+        +invoiceNumber: String
+        +invoiceDate: DateTime
+        +totalAmount: Decimal
+        +status: PurchaseStatus
+        +notes: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class PurchaseItem {
+        +id: String
+        +purchaseInvoiceId: String
+        +inventoryId: String
+        +batchCode: String
+        +expiryDate: DateTime
+        +quantity: Int
+        +unitPrice: Decimal
+        +totalPrice: Decimal
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+}
+
+' === SALES & ORDERS ===
+package "Sales & Orders" #FFEBEE {
+    
+    class PharmacyOrder {
+        +id: String
+        +pharmacyId: String
+        +customerId: String
+        +orderNumber: String
+        +status: OrderStatus
+        +subtotal: Decimal
+        +deliveryFee: Decimal
+        +totalAmount: Decimal
+        +shippingAddress: String
+        +note: String?
+        +paymentMethod: String?
+        +paymentStatus: PaymentStatus
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class OrderItem {
+        +id: String
+        +orderId: String
+        +inventoryId: String
+        +unitId: String?
+        +quantity: Int
+        +price: Decimal
+        +costPrice: Decimal <<snapshot>>
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class PharmacyInvoice {
+        +id: String
+        +pharmacyId: String
+        +customerId: String
+        +orderId: String?
+        +invoiceNumber: String
+        +invoiceDate: DateTime
+        +totalAmount: Decimal
+        +type: InvoiceType
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class Payment {
+        +id: String
+        +orderId: String
+        +amount: Decimal
+        +paymentMethod: String
+        +status: PaymentStatus
+        +transactionId: String?
+        +paidAt: DateTime?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class Delivery {
+        +id: String
+        +orderId: String
+        +pharmacyId: String
+        +deliveryService: String
+        +deliveryFee: Decimal
+        +status: DeliveryStatus
+        +deliveryPersonName: String?
+        +deliveryPersonPhone: String?
+        +trackingUrl: String?
+        +deliveryStaffId: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+}
+
+' === CUSTOMER HEALTH ===
+package "Customer Health & CRM" #E0F7FA {
+    
+    class CustomerHealthMetrics {
+        +id: String
+        +customerId: String
+        +gender: String?
+        +dateOfBirth: DateTime?
+        +bloodPressureSystolic: Int?
+        +bloodPressureDiastolic: Int?
+        +weight: Float?
+        +height: Float?
+        +bmi: Float?
+        +bmr: Float?
+        +bloodType: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class CustomerAllergy {
+        +id: String
+        +customerId: String
+        +name: String
+        +description: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class CustomerHealthRecord {
+        +id: String
+        +customerId: String
+        +recordType: String
+        +title: String
+        +description: String?
+        +dateRecorded: DateTime
+        +providerName: String?
+        +fileUrl: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class CustomerCart {
+        +id: String
+        +customerId: String
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class CartItem {
+        +id: String
+        +cartId: String
+        +inventoryId: String
+        +unitId: String?
+        +quantity: Int
+        +unitPrice: Decimal
+        +totalPrice: Decimal
+        +isSelected: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+}
+
+' === REMINDERS ===
+package "Medicine Reminders" #FFF8E1 {
+    
+    class MedicineReminder {
+        +id: String
+        +customerId: String
+        +medicineName: String
+        +dosage: String
+        +frequencyType: String
+        +specificDays: Json?
+        +intervalDays: Int?
+        +time: String
+        +startDate: DateTime
+        +endDate: DateTime?
+        +isActive: Boolean
+        +notes: String?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class ReminderNotification {
+        +id: String
+        +reminderId: String
+        +scheduledTime: DateTime
+        +status: NotificationStatus
+        +pushNotificationId: String?
+        +sentAt: DateTime?
+        +acknowledgedAt: DateTime?
+        +errorMessage: String?
+        +createdAt: DateTime
+    }
+    
+    class ReminderLog {
+        +id: String
+        +reminderId: String
+        +notificationId: String?
+        +customerId: String
+        +medicineName: String
+        +dosage: String
+        +actionType: String
+        +scheduledTime: DateTime
+        +actionTime: DateTime?
+        +notes: String?
+        +createdAt: DateTime
+    }
+}
+
+' === NOTIFICATIONS ===
+package "Notifications" #FCE4EC {
+    
+    class StaffNotification {
+        +id: String
+        +staffId: String
+        +pharmacyId: String
+        +type: StaffNotificationType
+        +title: String
+        +message: String
+        +metadata: Json?
+        +isRead: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class CustomerNotification {
+        +id: String
+        +customerId: String
+        +type: CustomerNotificationType
+        +title: String
+        +message: String
+        +metadata: Json?
+        +isRead: Boolean
+        +pushSent: Boolean
+        +pushSentAt: DateTime?
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+    
+    class CustomerPushToken {
+        +id: String
+        +customerId: String
+        +token: String
+        +deviceType: String
+        +deviceId: String?
+        +isActive: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+}
+
+' === SECURITY & AUDIT ===
+package "Security & Audit" #ECEFF1 {
+    
+    class AuditLog {
+        +id: String
+        +pharmacyId: String?
+        +actorId: String
+        +actorType: ActorType
+        +action: AuditAction
+        +resource: String
+        +resourceId: String?
+        +oldData: Json?
+        +newData: Json?
+        +ipAddress: String?
+        +userAgent: String?
+        +status: AuditStatus
+        +metadata: Json?
+        +createdAt: DateTime
+    }
+    
+    class Otp {
+        +id: String
+        +phone: String
+        +otp: String
+        +expiresAt: DateTime
+        +isUsed: Boolean
+        +createdAt: DateTime
+        +updatedAt: DateTime
+    }
+}
+
+' === RELATIONSHIPS ===
+
+' Owner <-> Pharmacy
+Owner "1" --> "*" Pharmacy : owns
+Owner "1" --> "*" RefreshToken : sessions
+
+' Pharmacy Hub
+Pharmacy "1" --> "*" PharmacyStaff : employs
+Pharmacy "1" --> "*" PharmacyInventory : stocks
+Pharmacy "1" --> "*" PharmacyOrder : receives
+Pharmacy "1" --> "*" PharmacyInvoice : issues
+Pharmacy "1" --> "*" StorageLocation : has
+Pharmacy "1" --> "*" StaffNotification : broadcasts
+Pharmacy "1" --> "*" PurchaseInvoice : purchases
+Pharmacy "1" --> "*" AuditLog : logs
+
+' Staff Relations
+PharmacyStaff "1" --> "*" StaffNotification : receives
+PharmacyStaff "1" --> "*" RefreshToken : sessions
+PharmacyStaff "1" --> "*" Delivery : delivers
+
+' Customer Central Hub
+Customer "1" --> "0..1" CustomerHealthMetrics : has
+Customer "1" --> "0..1" CustomerCart : owns
+Customer "1" --> "*" CustomerAllergy : has
+Customer "1" --> "*" CustomerHealthRecord : stores
+Customer "1" --> "*" MedicineReminder : schedules
+Customer "1" --> "*" PharmacyOrder : places
+Customer "1" --> "*" CustomerNotification : receives
+Customer "1" --> "*" CustomerPushToken : devices
+Customer "1" --> "*" ReminderLog : logs
+Customer "1" --> "*" RefreshToken : sessions
+
+' Catalog & Supplier
+Supplier "1" --> "*" PharmaSalesRep : employs
+Supplier "1" --> "*" GlobalMedicineCatalog : provides
+PharmaSalesRep "1" --> "*" GlobalMedicineCatalog : uploads
+Category "1" --> "*" GlobalMedicineCatalog : categorizes
+Brand "1" --> "*" GlobalMedicineCatalog : brands
+Category "1" --> "*" PharmacyInventory : categorizes
+Brand "1" --> "*" PharmacyInventory : brands
+
+' Inventory
+PharmacyInventory "1" --> "*" InventoryBatch : batches
+PharmacyInventory "1" --> "*" InventoryUnit : units
+PharmacyInventory "*" --> "0..1" GlobalMedicineCatalog : links
+PharmacyInventory "*" --> "0..1" StorageLocation : stored_in
+PharmacyInventory "1" --> "*" OrderItem : sold
+PharmacyInventory "1" --> "*" CartItem : added_to
+
+' Order Hierarchy
+PharmacyOrder "1" --> "*" OrderItem : contains
+PharmacyOrder "1" --> "0..1" PharmacyInvoice : invoiced
+PharmacyOrder "1" --> "0..1" Payment : paid_by
+PharmacyOrder "1" --> "0..1" Delivery : delivered
+
+' Invoice
+PharmacyInvoice "1" --> "*" InvoiceItem : contains
+
+' Purchase
+PurchaseInvoice "1" --> "*" PurchaseItem : contains
+PurchaseInvoice "*" --> "0..1" Supplier : from
+
+' Reminder Cascade
+MedicineReminder "1" --> "*" ReminderNotification : triggers
+MedicineReminder "1" --> "*" ReminderLog : logs
+ReminderNotification "1" --> "*" ReminderLog : acknowledged_by
+
+' Cart
+CustomerCart "1" --> "*" CartItem : contains
+
+' SystemAdmin
+SystemAdmin "1" --> "*" RefreshToken : sessions
+
+@enduml
+
+==================================================
+PART 2.1: HIGH-LEVEL OVERVIEW DIAGRAM (Bird's Eye View)
+==================================================
+
+@startuml
+!theme plain
+top to bottom direction
+skinparam backgroundColor #FEFEFE
+skinparam packageStyle rectangle
+skinparam nodesep 20
+skinparam ranksep 30
+
+title High-Level Class Diagram - MediMaster Overview
+
+' === CLUSTER 1 ===
+package "Core & Access Control" #E3F2FD {
+    class Owner
+    class Pharmacy
+    class PharmacyStaff
+    class SystemAdmin
+    class AuditLog
+}
+
+' === CLUSTER 2 ===
+package "Inventory & Catalog" #E8F5E9 {
+    class PharmacyInventory
+    class InventoryBatch
+    class GlobalMedicineCatalog
+    class Supplier
+    class PurchaseInvoice
+}
+
+' === CLUSTER 3 ===
+package "Sales & Finance" #FFEBEE {
+    class PharmacyOrder
+    class PharmacyInvoice
+    class Delivery
+    class PharmacyAnalytics
+}
+
+' === CLUSTER 4 ===
+package "Customer CRM & Health" #FCE4EC {
+    class Customer
+    class CustomerHealthMetrics
+    class MedicineReminder
+    class CustomerNotification
+}
+
+' === LAYOUT HINTS (ÉP XẾP CHỒNG) ===
+"Core & Access Control" -[hidden]down-> "Inventory & Catalog"
+"Inventory & Catalog" -[hidden]down-> "Sales & Finance"
+"Sales & Finance" -[hidden]down-> "Customer CRM & Health"
+
+' === KEY RELATIONSHIPS ===
+Owner "1" --> "*" Pharmacy
+Pharmacy "1" --> "*" PharmacyInventory
+Pharmacy "1" --> "*" PharmacyOrder
+Customer "1" --> "*" PharmacyOrder
+PharmacyInventory "1" --> "*" InventoryBatch
+Supplier "1" --> "*" GlobalMedicineCatalog
+@enduml
+
+==================================================
+PART 2.2: CLUSTER 1 - CORE & ACCESS CONTROL (Linh hồn hệ thống)
+==================================================
+
+@startuml
+!theme plain
+' Cấu hình layout để vuông vức hơn
+left to right direction
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam classAttributeFontSize 9
+skinparam defaultFontName Segoe UI
+skinparam linetype ortho
+
+title Domain Cluster 1: Identity & Access Management (IAM)\nMulti-tenancy Architecture & Session Security
+
+' === ENUMS ===
+enum UserStatus {
+    PENDING
+    ACTIVE
+    SUSPENDED
+}
+
+enum StaffRole {
+    MANAGER
+    PHARMACIST
+    STAFF
+}
+
+' === CLASSES ===
+
+class SystemAdministrator {
+    +id: String
+    +email: String
+    +password: String
+    +name: String
+    --
+    +suspendUser(userId, userType)
+    +reactivateUser(userId, userType)
+    +reviewTenantRegistration(ownerId)
+    +exportSystemAuditLogs(criteria)
+}
+
+class TenantOwner {
+    +id: String
+    +email: String
+    +password: String
+    +name: String
+    +phone: String?
+    +status: UserStatus
+    +subscriptionExpiry: DateTime?
+    +isActive: Boolean
+}
+
+class PharmacyBranch {
+    +id: String
+    +tenantOwnerId: String
+    +name: String
+    +address: String
+    +coordinates: Point
+    +phone: String
+    +operatingHours: Json
+    +isActive: Boolean
+}
+
+class PharmacyStaff {
+    +id: String
+    +pharmacyId: String
+    +username: String
+    +password: String
+    +role: StaffRole
+    +isActive: Boolean
+}
+
+class PersistentSession {
+    +id: String
+    +tokenHash: String
+    +issuedAt: DateTime
+    +expiresAt: DateTime
+    +revokedAt: DateTime?
+    +replacedByTokenId: String?
+    --
+    +ownerId: UUID?
+    +staffId: UUID?
+    +adminId: UUID?
+}
+
+class SecurityAuditLog {
+    +id: String
+    +pharmacyId: String?
+    +actorId: String
+    +actorType: Enum
+    +action: AuditAction
+    +resourcePath: String
+    +payloadSnapshot: Json
+    +clientIp: String
+    +status: AuditStatus
+}
+
+' === RELATIONSHIPS ===
+TenantOwner "1" *-- "*" PharmacyBranch : mandates
+TenantOwner "1" o-- "*" PersistentSession : maintains
+PharmacyBranch "1" *-- "*" PharmacyStaff : manages
+PharmacyBranch "1" ..> SecurityAuditLog : tracks
+PharmacyStaff "1" o-- "*" PersistentSession : maintains
+SystemAdministrator "1" o-- "*" PersistentSession : maintains
+
+' === LOGIC NOTES ===
+note bottom of SystemAdministrator
+  **Administrative Control (Kill Switch):**
+  1. Administrative suspension of Account
+  2. Immediate revocation of all PersistentSessions
+  3. Security Event Broadcast (Webhook)
+  4. Non-repudiation via SecurityAuditLog
+end note
+
+note bottom of PersistentSession
+  **Session Security Logic:**
+  - JWT Rotation Mechanism
+  - Token Reuse Detection (TRD)
+  - Parent-Child Token Chaining
+end note
+
+@enduml
+
+==================================================
+PART 2.3: CLUSTER 2 - INVENTORY & CATALOG (Lục địa Kho)
+==================================================
+
+@startuml
+!theme plain
+' === ÉP HƯỚNG DỌC CỨNG HƠN ===
+top to bottom direction
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam classAttributeFontSize 9
+skinparam defaultFontName Segoe UI
+skinparam linetype ortho
+skinparam nodesep 30
+skinparam ranksep 40
+' Thêm dòng này để các class trong cùng package xếp dọc
+skinparam packageStyle frame
+
+title Domain Cluster 2: Global Catalog & Inventory Lifecycle Management\nSupply Chain Integration, Procurement, and Batch Tracking
+
+' === ENUMS ===
+enum ValidationStatus { 
+    PENDING
+    AUTHORIZED
+    DECLINED 
+}
+
+enum ProcurementStatus { 
+    DRAFT
+    COMMITTED
+    COMPLETED
+    VOID 
+}
+
+' === TẦNG 1: PRODUCT CATALOG LAYER ===
+package "Global Product Catalog" #F3E5F5 {
+    class Manufacturer {
+        +id: String
+        +name: String
+    }
+
+    class SalesRepresentative {
+        +id: String
+        +fullName: String
+        --
+        +uploadProductManifest()
+    }
+
+    class MasterProductCatalog << Central Registry >> {
+        +id: String
+        +productName: String
+        +status: ValidationStatus
+        --
+        +authorizeForMarket()
+    }
+    
+    class ProductCategory {
+        +id: String
+        +categoryName: String
+    }
+    
+    ' Ép các class trong package xếp dọc
+    Manufacturer -[hidden]down-> SalesRepresentative
+    SalesRepresentative -[hidden]down-> MasterProductCatalog
+    MasterProductCatalog -[hidden]down-> ProductCategory
+}
+
+' === TẦNG 2: PROCUREMENT SYSTEM ===
+package "Procurement System" #E1F5FE {
+    class PurchaseOrder {
+        +id: String
+        +totalValuation: Decimal
+        +orderStatus: ProcurementStatus
+        --
+        +commitToInventory()
+    }
+
+    class ProcurementLineItem {
+        +id: String
+        +quantityOrdered: Int
+    }
+    
+    PurchaseOrder -[hidden]down-> ProcurementLineItem
+}
+
+' === TẦNG 3: BRANCH INVENTORY MANAGEMENT ===
+package "Branch Inventory Management" #E8F5E9 {
+    class InventoryStock << Branch Entity >> {
+        +id: String
+        +currentStockLevel: Int
+        --
+        +reconcileStock()
+        +evaluateReorderPoint()
+    }
+
+    class BatchRecord << FIFO/FEFO >> {
+        +id: String
+        +expirationDate: DateTime
+        +unitAcquisitionCost: Decimal
+    }
+
+    class UnitOfMeasurement {
+        +unitName: String
+        +conversionFactor: Int
+    }
+    
+    class WarehouseLocation {
+        +id: String
+        +locationIdentifier: String
+    }
+    
+    ' Ép 2 cột: trái (Stock + Batch) | phải (Unit + Warehouse)
+    InventoryStock -[hidden]down-> BatchRecord
+    UnitOfMeasurement -[hidden]down-> WarehouseLocation
+    InventoryStock -[hidden]right-> UnitOfMeasurement
+}
+
+' === ÉP LIÊN KẾT GIỮA CÁC TẦNG (QUAN TRỌNG) ===
+MasterProductCatalog -[hidden]down-> PurchaseOrder
+ProcurementLineItem -[hidden]down-> InventoryStock
+
+' === RELATIONSHIPS ===
+Manufacturer "1" *-down- "*" SalesRepresentative
+Manufacturer "1" *-down- "*" MasterProductCatalog
+SalesRepresentative "1" ..> MasterProductCatalog : submits
+ProductCategory "1" -left- "*" MasterProductCatalog
+
+MasterProductCatalog "1" <.down. "*" InventoryStock : references
+PurchaseOrder "1" *-down- "*" ProcurementLineItem
+PurchaseOrder "*" -up- "0..1" Manufacturer
+ProcurementLineItem "*" -down- "1" InventoryStock : updates
+
+InventoryStock "1" *-down- "*" BatchRecord
+InventoryStock "1" *-right- "*" UnitOfMeasurement
+InventoryStock "*" -right- "0..1" WarehouseLocation
+
+' === NOTES (ĐẶT BÊN ĐỂ KHÔNG LÀM DÀI) ===
+note left of BatchRecord
+  **FIFO/FEFO:**
+  expirationDate ASC
+end note
+
+note right of SalesRepresentative
+  **Manifest Sanitization**
+end note
+
+@enduml
+
+==================================================
+PART 2.4: CLUSTER 3 - SALES & FINANCE (Cỗ máy in tiền)
+==================================================
+
+@startuml
+!theme plain
+' === ÉP HƯỚNG DỌC ===
+top to bottom direction
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam classAttributeFontSize 9
+skinparam defaultFontName Segoe UI
+skinparam linetype ortho
+skinparam nodesep 30
+skinparam ranksep 40
+skinparam packageStyle frame
+
+title Domain Cluster 3: Order-to-Cash Lifecycle & Financial Analytics\nTransaction Processing, Cost Attribution, and Revenue Recognition
+
+' === ENUMS ===
+enum OrderStatus {
+    PENDING
+    CONFIRMED
+    PREPARING
+    OUT_FOR_DELIVERY
+    DELIVERED
+    CANCELLED
+}
+
+enum PaymentStatus {
+    PENDING
+    PAID
+    REFUNDED
+    FAILED
+}
+
+enum DeliveryStatus {
+    PENDING
+    PICKED_UP
+    IN_TRANSIT
+    DELIVERED
+    FAILED
+}
+
+enum InvoiceType {
+    ONLINE
+    OFFLINE
+}
+
+' === TẦNG 1: ORDER MANAGEMENT ===
+package "Order Management" #FFEBEE {
+    class PharmacyOrder << Aggregate Root >> {
+        +id: String
+        +pharmacyId: String
+        +customerId: String
+        +orderNumber: String
+        +status: OrderStatus
+        +subtotal: Decimal
+        +deliveryFee: Decimal
+        +totalAmount: Decimal
+        +shippingAddress: String
+        +paymentMethod: String?
+        +paymentStatus: PaymentStatus
+    }
+
+    class OrderItem << Cost Snapshot >> {
+        +id: String
+        +orderId: String
+        +inventoryId: String
+        +unitId: String?
+        +quantity: Int
+        +price: Decimal
+        ==
+        **+costPrice: Decimal**
+        //(Immutable COGS at transaction time)//
+    }
+    
+    PharmacyOrder -[hidden]down-> OrderItem
+}
+
+' === TẦNG 2: BILLING & FULFILLMENT ===
+package "Billing & Fulfillment" #E3F2FD {
+    class PharmacyInvoice {
+        +id: String
+        +pharmacyId: String
+        +customerId: String
+        +orderId: String?
+        +invoiceNumber: String
+        +invoiceDate: DateTime
+        +totalAmount: Decimal
+        +type: InvoiceType
+    }
+
+    class InvoiceItem {
+        +id: String
+        +invoiceId: String
+        +inventoryId: String?
+        +quantity: Int
+        +price: Decimal
+    }
+
+    class Payment {
+        +id: String
+        +orderId: String
+        +amount: Decimal
+        +paymentMethod: String
+        +status: PaymentStatus
+        +transactionId: String?
+        +paidAt: DateTime?
+    }
+
+    class Delivery {
+        +id: String
+        +orderId: String
+        +pharmacyId: String
+        +deliveryService: String
+        +deliveryFee: Decimal
+        +status: DeliveryStatus
+        +trackingUrl: String?
+        +deliveryStaffId: String?
+    }
+    
+    ' Ép layout trong package
+    PharmacyInvoice -[hidden]right-> Payment
+    InvoiceItem -[hidden]right-> Delivery
+    PharmacyInvoice -[hidden]down-> InvoiceItem
+    Payment -[hidden]down-> Delivery
+}
+
+' === TẦNG 3: ANALYTICS ===
+package "Financial Analytics" #E8F5E9 {
+    class PharmacyAnalytics << Materialized View >> {
+        +id: String
+        +pharmacyId: String
+        +date: Date
+        +totalRevenue: Decimal
+        +totalOrders: Int
+        +totalCustomers: Int
+        +averageOrderValue: Decimal
+        +total_profit: Decimal
+        --
+        //Pre-computed by Background Worker//
+    }
+}
+
+' === ÉP LIÊN KẾT GIỮA CÁC TẦNG ===
+OrderItem -[hidden]down-> PharmacyInvoice
+Delivery -[hidden]down-> PharmacyAnalytics
+
+' === RELATIONSHIPS ===
+PharmacyOrder "1" *-down- "*" OrderItem : comprises
+PharmacyOrder "1" -down- "0..1" PharmacyInvoice : generates
+PharmacyOrder "1" -down- "0..1" Payment : settles via
+PharmacyOrder "1" -down- "0..1" Delivery : fulfilled by
+PharmacyInvoice "1" *-down- "*" InvoiceItem : itemizes
+PharmacyOrder "*" ..> PharmacyAnalytics : materialized into
+
+' === NOTES ===
+note right of OrderItem
+  **Cost Attribution (Snapshot Pricing):**
+  
+  At transaction commit:
+  1. Query oldest batch (FEFO)
+  2. Capture purchasePrice
+  3. Persist as costPrice
+  
+  **Accounting Integrity:**
+  Gross Profit = Sum(price - costPrice)
+  Value is immutable post-transaction
+end note
+
+note left of PharmacyAnalytics
+  **Materialized Analytics:**
+  - Async worker aggregation
+  - Optimized dashboard queries
+  - total_profit derived from
+    OrderItem.costPrice
+end note
+
+@enduml
+
+==================================================
+PART 2.5: CLUSTER 4 - CUSTOMER CRM & HEALTH (Trái tim người dùng)
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam classFontSize 10
+skinparam defaultFontName Segoe UI
+
+title Cluster 4: Customer CRM & Health\n"Trái tim người dùng" - Health Hub & Reminder System
+
+' === ENUMS ===
+enum NotificationStatus {
+    PENDING
+    SENT
+    DELIVERED
+    ACKNOWLEDGED
+    FAILED
+}
+
+' === CUSTOMER CORE ===
+class Customer << Health Hub >> {
+    +id: String
+    +phone: String
+    +email: String?
+    +password: String?
+    +fullName: String?
+    +address: String?
+    +verified: Boolean
+    +registrationSource: String?
+}
+
+' === HEALTH DATA ===
+class CustomerHealthMetrics << 1:1 >> {
+    +id: String
+    +customerId: String
+    +gender: String?
+    +dateOfBirth: DateTime?
+    +bloodPressureSystolic: Int?
+    +bloodPressureDiastolic: Int?
+    +weight: Float?
+    +height: Float?
+    +bmi: Float?
+    +bmr: Float?
+    +bloodType: String?
+}
+
+class CustomerAllergy {
+    +id: String
+    +customerId: String
+    +name: String
+    +description: String?
+}
+
+class CustomerHealthRecord {
+    +id: String
+    +customerId: String
+    +recordType: String
+    +title: String
+    +description: String?
+    +dateRecorded: DateTime
+    +providerName: String?
+    +fileUrl: String?
+}
+
+' === SHOPPING ===
+class CustomerCart << 1:1 >> {
+    +id: String
+    +customerId: String
+}
+
+class CartItem {
+    +id: String
+    +cartId: String
+    +inventoryId: String
+    +unitId: String?
+    +quantity: Int
+    +unitPrice: Decimal
+    +totalPrice: Decimal
+    +isSelected: Boolean
+}
+
+' === REMINDER SYSTEM ===
+class MedicineReminder << Schedule >> {
+    +id: String
+    +customerId: String
+    +medicineName: String
+    +dosage: String
+    +frequencyType: String
+    +specificDays: Json?
+    +intervalDays: Int?
+    +time: String
+    +startDate: DateTime
+    +endDate: DateTime?
+    +isActive: Boolean
+    +notes: String?
+}
+
+class ReminderNotification << Push >> {
+    +id: String
+    +reminderId: String
+    +scheduledTime: DateTime
+    +status: NotificationStatus
+    +pushNotificationId: String?
+    +sentAt: DateTime?
+    +acknowledgedAt: DateTime?
+    +errorMessage: String?
+}
+
+class ReminderLog << Adherence >> {
+    +id: String
+    +reminderId: String
+    +notificationId: String?
+    +customerId: String
+    +medicineName: String
+    +dosage: String
+    +actionType: String
+    +scheduledTime: DateTime
+    +actionTime: DateTime?
+    +notes: String?
+}
+
+' === NOTIFICATIONS ===
+class CustomerNotification {
+    +id: String
+    +customerId: String
+    +type: CustomerNotificationType
+    +title: String
+    +message: String
+    +metadata: Json?
+    +isRead: Boolean
+    +pushSent: Boolean
+}
+
+class CustomerPushToken << Device >> {
+    +id: String
+    +customerId: String
+    +token: String
+    +deviceType: String
+    +deviceId: String?
+    +isActive: Boolean
+}
+
+' === RELATIONSHIPS ===
+Customer "1" --> "0..1" CustomerHealthMetrics : has
+Customer "1" --> "0..1" CustomerCart : owns
+Customer "1" --> "*" CustomerAllergy : has
+Customer "1" --> "*" CustomerHealthRecord : stores
+Customer "1" --> "*" MedicineReminder : schedules
+Customer "1" --> "*" CustomerNotification : receives
+Customer "1" --> "*" CustomerPushToken : devices
+Customer "1" --> "*" ReminderLog : logs
+MedicineReminder "1" --> "*" ReminderNotification : triggers
+MedicineReminder "1" --> "*" ReminderLog : logs
+ReminderNotification "1" --> "*" ReminderLog : acknowledged_by
+CustomerCart "1" --> "*" CartItem : contains
+
+note right of MedicineReminder
+  <b>Frequency Types:</b>
+  - daily
+  - specific_days (Mon, Wed, Fri)
+  - interval (every 3 days)
+  
+  <b>Worker Schedule:</b>
+  - scheduler.worker (1 min)
+  - missed-check.worker (5 min)
+end note
+
+note left of ReminderLog
+  <b>Action Types:</b>
+  - taken
+  - skipped
+  - missed
+  
+  <b>Adherence Rate:</b>
+  taken / (taken + missed)
+end note
+
+note bottom of CustomerPushToken
+  <b>Expo Push Notifications</b>
+  - Multiple devices per user
+  - notification.worker sends
+end note
+
+@enduml
+
+==================================================
+PART 3: LATEX DOCUMENTATION
+==================================================
+
+\subsubsection{Class Diagram}
+Class diagrams are a form of UML (Unified Modeling Language) diagram commonly used in software engineering to visually depict the structure and relationships of classes within a system. They are essential tools for designing and visualizing object-oriented systems, offering a high-level perspective on a system's architecture. By illustrating how classes interact and relate, class diagrams help communicate and document the organization of software effectively\cite{classdia}.
+
+Due to the complexity of the PharmaEco system with \textbf{32 distinct entity classes}, the class diagram is organized into four logical clusters for clarity:
+
+% === HIGH-LEVEL OVERVIEW ===
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=16cm]{images/class_dia_overview.png}
+    \caption{High-Level Class Diagram Overview (32 Classes)}
+    \label{fig:class_overview}
+\end{figure}
+
+Fig \ref{fig:class_overview} provides a bird's-eye view of the entire system, showing the four major clusters and their key interconnections. Each cluster is detailed in the following subsections.
+
+% === CLUSTER 1: CORE & ACCESS CONTROL ===
+\paragraph{Cluster 1: Core \& Access Control (``Linh hồn hệ thống'')}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{images/class_dia_cluster1.png}
+    \caption{Cluster 1: Core \& Access Control - Multi-tenancy \& Kill Switch}
+    \label{fig:class_cluster1}
+\end{figure}
+
+Fig \ref{fig:class_cluster1} illustrates the authentication and multi-tenancy architecture. The \texttt{Owner} class represents the top-level tenant, each owning multiple \texttt{Pharmacy} branches. \texttt{PharmacyStaff} are scoped to individual pharmacies with role-based access (MANAGER, PHARMACIST, STAFF).
+
+The \texttt{RefreshToken} uses a polymorphic pattern to serve all user types (\texttt{Owner}, \texttt{PharmacyStaff}, \texttt{Customer}, \texttt{SystemAdmin}). This enables the \textbf{Kill Switch} feature: \texttt{AdminService.globalBan()} instantly revokes all tokens for a user, triggering a Discord alert and logging to \texttt{AuditLog}.
+
+% === CLUSTER 2: INVENTORY & CATALOG ===
+\paragraph{Cluster 2: Inventory \& Catalog (``Lục địa Kho'')}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{images/class_dia_cluster2.png}
+    \caption{Cluster 2: Inventory \& Catalog - FIFO/FEFO \& Global Catalog}
+    \label{fig:class_cluster2}
+\end{figure}
+
+Fig \ref{fig:class_cluster2} shows the inventory management system. \texttt{PharmacyInventory} tracks local stock, linked to \texttt{InventoryBatch} for FIFO/FEFO (First Expired, First Out) expiry management. Each batch records \texttt{purchasePrice} for accurate cost tracking.
+
+\texttt{GlobalMedicineCatalog} is the central medicine database, populated by \texttt{PharmaSalesRep} via CSV upload (with injection sanitization). Items require approval before becoming visible to pharmacies.
+
+% === CLUSTER 3: SALES & FINANCE ===
+\paragraph{Cluster 3: Sales \& Finance (``Cỗ máy in tiền'')}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{images/class_dia_cluster3.png}
+    \caption{Cluster 3: Sales \& Finance - Snapshot Pricing for P\&L}
+    \label{fig:class_cluster3}
+\end{figure}
+
+Fig \ref{fig:class_cluster3} depicts the sales process. The critical feature is \textbf{Snapshot Pricing}: when an order is created, \texttt{OrderItem.costPrice} captures the FIFO cost from the oldest batch at that exact moment. This enables accurate Profit \& Loss calculations even if batch prices change later.
+
+\texttt{PharmacyAnalytics} stores pre-computed daily aggregates (revenue, profit, order count) for fast dashboard queries, updated by background workers.
+
+% === CLUSTER 4: CUSTOMER CRM & HEALTH ===
+\paragraph{Cluster 4: Customer CRM \& Health (``Trái tim người dùng'')}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=15cm]{images/class_dia_cluster4.png}
+    \caption{Cluster 4: Customer CRM \& Health - Health Hub \& Reminder System}
+    \label{fig:class_cluster4}
+\end{figure}
+
+Fig \ref{fig:class_cluster4} shows the customer-centric design. \texttt{Customer} serves as a health data hub with:
+\begin{itemize}
+    \item 1:1 relationships: \texttt{CustomerHealthMetrics} (vitals), \texttt{CustomerCart}
+    \item 1:N relationships: \texttt{CustomerAllergy}, \texttt{CustomerHealthRecord}, \texttt{MedicineReminder}
+\end{itemize}
+
+The \textbf{Medicine Reminder System} features a cascade: \texttt{MedicineReminder} $\to$ \texttt{ReminderNotification} $\to$ \texttt{ReminderLog}. Background workers (\texttt{scheduler.worker}, \texttt{missed-check.worker}) generate notifications and track adherence (taken/skipped/missed).
+
+% === SUMMARY TABLE ===
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|l|p{6cm}|}
+\hline
+\textbf{Cluster} & \textbf{Key Classes} & \textbf{Purpose} \\ \hline
+1. Core \& Access Control & Owner, Pharmacy, Staff, SystemAdmin, RefreshToken, AuditLog & Multi-tenancy, Kill Switch, Forensic Logging \\ \hline
+2. Inventory \& Catalog & PharmacyInventory, InventoryBatch, GlobalMedicineCatalog, Supplier & FIFO/FEFO, Global Medicine Database \\ \hline
+3. Sales \& Finance & PharmacyOrder, OrderItem, Invoice, Payment, Analytics & Snapshot Pricing, P\&L Tracking \\ \hline
+4. Customer CRM \& Health & Customer, HealthMetrics, Reminder, ReminderLog, Allergy & Health Hub, Adherence Tracking \\ \hline
+\end{tabular}
+\caption{Class Diagram Clusters Summary}
+\label{tab:class_clusters}
+\end{table}
+
+% === SERVICE CLASSES TABLE ===
+\paragraph{Service Classes}
+Following Clean Architecture principles, each domain module has a dedicated service class:
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|p{8cm}|}
+\hline
+\textbf{Service} & \textbf{Key Methods} \\ \hline
+AuthService & registerOwner, loginOwner, registerStaff, loginStaff, registerCustomer, loginCustomer, refreshToken, changePassword, \textbf{revokeAllSessions} (Kill Switch core) \\ \hline
+AdminService & \textbf{globalBan} (``Death Button''), reactivateUser, approveOwner, listPendingOwners, exportData, getAuditLogs \\ \hline
+InventoryService & create, findAll, findById, update, addStock (FIFO), deductStock (FIFO/FEFO), getExpiryAlerts, getLowStockAlerts, delete \\ \hline
+SalesService & createOrder (server-side pricing), getOldestBatchCost, getReceipt \\ \hline
+CustomerService & searchCustomers, createCustomer, getCustomerProfile, addHealthMetric, addAllergy, getMe, getGlobalHistory \\ \hline
+CatalogService & create, findAll, \textbf{processCatalogCsv} (CSV injection sanitization), getPendingItems, approveCatalogItems, sendPurchaseRequest \\ \hline
+ReminderService & createReminder, getMyReminders, updateReminder, deleteReminder, logAction, getAdherenceHistory \\ \hline
+AnalyticsService & getDashboardStats, getRevenueChart, getProfitLoss, getTopSelling, getInventoryValuation \\ \hline
+StaffNotificationService & notifyPharmacy, markAsRead, markAllAsRead, getUnreadCount, getNotifications \\ \hline
+\end{tabular}
+\caption{Service Classes and Their Key Methods}
+\label{tab:service_classes}
+\end{table}
+
+==================================================
+END OF DOCUMENT
+==================================================
