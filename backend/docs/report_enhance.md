@@ -14,6 +14,8 @@ Non-repudiation: Forensic-ready audit trails.
 Financial: Accurate COGS (Cost of Goods Sold) calculation.
 5. Performance	Synchronous Blocking: Heavy tasks (imports/exports) block the main thread. Direct DB queries.	Asynchronous & Caching: Redis (Cache-aside) for frequent reads. BullMQ (Workers) for heavy tasks.	Latency: 95th percentile response time < 200ms.
 Availability: Non-blocking operations.
+6. Real-Time Interaction	Poling / Manual Refresh: Client checks for updates periodically. High latency, wasted bandwidth.	Event-Driven (WebSockets): Server pushes updates instantly (Order, Stock). Hybrid Adapter (Redis/Memory).	UX: "Grab-like" instant feedback.
+Efficiency: Reduced server load from polling.
 Part 2: Algorithmic Descriptions (Pseudo-code)
 The following algorithms illustrate the enhanced logic implemented in the core system.
 

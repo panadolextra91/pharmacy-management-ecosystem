@@ -28,6 +28,8 @@ async function main() {
     // Order matters due to FKs
     await prisma.purchaseItem.deleteMany();
     await prisma.purchaseInvoice.deleteMany();
+    await prisma.systemAdmin.deleteMany(); // Cleanup admins
+    await prisma.purchaseInvoice.deleteMany();
     await prisma.invoiceItem.deleteMany();
     await prisma.pharmacyInvoice.deleteMany();
     await prisma.cartItem.deleteMany();
@@ -117,6 +119,16 @@ async function main() {
     // 4. OWNERS & PHARMACIES
     console.log('👥 Creating Owners & Pharmacies...');
     const passwordHash = await bcrypt.hash('123456', 10);
+
+    // 4.1 Create System Admin
+    await prisma.systemAdmin.create({
+        data: {
+            name: 'Super Admin',
+            email: 'admin@pharmacy-saas.com',
+            password: passwordHash
+        }
+    });
+    console.log('   👑 System Admin Created.');
 
     const owners = [
         { name: 'Nguyen Van Ty Phus (Big Corp)', email: 'typhu@pharmacy.com', pharmacies: 2 },
@@ -214,3 +226,15 @@ main()
     .finally(async () => {
         await prisma.$disconnect();
     });
+
+// List account chùa, pass là 123456 hết
+// Mẹ Thư: admin@pharmacy-saas.com
+// Owners: Big Corp 2 nhà thuốc: typhu@pharmacy.com
+// SME 1 nhà thuốc: sme@pharmacy.com
+// Startup 1 nhà thuốc: startup@pharmacy.com`
+// Staffs: 
+// Mỗi nhà thuốc sẽ có 3 nhân viên với email theo định dạng:
+// manager.[ID_NHÀ_THUỐC]@p.com
+// pharmacist.[ID_NHÀ_THUỐC]@p.com
+// intern.[ID_NHÀ_THUỐC]@p.com
+

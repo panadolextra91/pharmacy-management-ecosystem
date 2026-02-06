@@ -2,6 +2,7 @@ import { ISalesRepository } from '../ports/sales.repository.port';
 import { CreateOrderDto } from '../application/dtos';
 import { AppError } from '../../../shared/middleware/error-handler.middleware';
 import prisma from '../../../shared/config/database';
+import { socketService } from '../../../shared/providers/socket.provider';
 // Dependencies
 import inventoryService, { InventoryService } from '../../inventory/application/inventory.service';
 
@@ -141,6 +142,24 @@ export class SalesService {
                 }
             }
 
+            // 5.1 Auto-Generate Invoice for POS Sales
+            if (isPosSale && order.paymentStatus === 'PAID') {
+                const invoiceNumber = `INV-${order.orderNumber.split('-')[1]}-${Math.floor(Math.random() * 1000)}`;
+                await this.repository.createInvoice({
+                    pharmacyId,
+                    customerId,
+                    orderId: order.id,
+                    invoiceNumber,
+                    totalAmount,
+                    type: 'OFFLINE', // POS = Offline/Direct
+                    items: validItems.map(vi => ({
+                        inventoryId: vi.inventoryId,
+                        quantity: vi.quantity,
+                        price: vi.price
+                    }))
+                }, tx);
+            }
+
             return order;
         });
 
@@ -161,6 +180,13 @@ export class SalesService {
                 });
             });
         }
+
+        // 7. REAL-TIME ALERT (Socket.io) - Fire & Forget
+        // Refactored: Direct call using Singleton (cleaner code)
+        socketService.toPharmacy(pharmacyId, 'order:created', {
+            orderId: result.id,
+            total: result.totalAmount
+        });
 
         return result;
     }

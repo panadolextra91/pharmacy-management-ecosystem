@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.io Test Client</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #0f0;
+        }
+
+        .box {
+            border: 1px solid #333;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+
+        input {
+            background: #333;
+            border: 1px solid #555;
+            color: white;
+            padding: 5px;
+            width: 300px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        #logs {
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔌 Socket.io Tester</h1>
+
+    <div class="box">
+        <label>JWT Token:</label>
+        <input type="text" id="token" placeholder="Bearer eyJhbGci...">
+        <button onclick="connect()">Connect</button>
+    </div>
+
+    <div class="box">
+        <h3>Logs:</h3>
+        <div id="logs">Waiting for connection...</div>
+    </div>
+
+    <script>
+        let socket;
+
+        function log(msg) {
+            const el = document.getElementById('logs');
+            const time = new Date().toLocaleTimeString();
+            el.innerHTML = `[${time}] ${msg}\n` + el.innerHTML;
+        }
+
+        function connect() {
+            let token = document.getElementById('token').value.trim();
+            if (!token) return alert('Enter Token!');
+
+            // Auto-add Bearer if missing
+            if (!token.startsWith('Bearer ')) {
+                token = `Bearer ${token}`;
+            }
+
+            if (socket) socket.disconnect();
+
+            // Connect to Backend
+            socket = io('http://localhost:3000', {
+                auth: { token: token },
+                transports: ['websocket']
+            });
+
+            socket.on('connect', () => {
+                log(`✅ Connected! ID: ${socket.id}`);
+            });
+
+            socket.on('connect_error', (err) => {
+                log(`❌ Connection Error: ${err.message}`);
+            });
+
+            socket.on('disconnect', () => {
+                log('⚠️ Disconnected');
+            });
+
+            // Listen for Events
+            socket.on('order:created', (data) => {
+                log(`💰 New Order Received! ID: ${data.orderId} | Total: ${data.total}`);
+                console.log('Order Data:', data);
+            });
+
+            socket.on('stock:low', (data) => {
+                log(`📉 Low Stock Alert! Item: ${data.inventoryId} | Remaining: ${data.currentStock}`);
+            });
+        }
+    </script>
+</body>
+
+</html>

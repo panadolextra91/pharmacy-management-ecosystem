@@ -59,8 +59,18 @@
 ## Sales (`/api/sales`)
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
-| POST | `/orders` | Create new Order. Supports POS. **Atomic Stock Check** (Prevents Overselling). | Yes |
+| POST | `/orders` | Create new Order. Supports POS. **Atomic Stock Check**. **Auto-Invoice if POS/Paid**. | Yes |
 | GET | `/invoices/:id/receipt` | Get structured receipt data (JSON) for printing/PDF generation. | Yes |
+
+## Real-Time WebSockets (`Socket.io`) ⚡
+*Base Endpoint: `/` (Port 3000)*
+*Auth: JWT (Query param or Auth Header)*
+
+| Event | Direction | Description | Payload |
+| :--- | :--- | :--- | :--- |
+| `join:pharmacy` | Client -> Server | Join pharmacy room | `{ pharmacyId }` |
+| `order:created` | Server -> Client | **New Order Alert** | `{ orderId, total }` |
+| `stock:low` | Server -> Client | **Low Stock Alert** | `{ inventoryId, stock }` |
 
 ## Inventory Management (`/api/inventory`)
 *Scoped to specific Pharmacy. Requires `pharmacyId` context.*

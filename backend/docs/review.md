@@ -86,6 +86,24 @@
 
 ---
 
+### 16. Real-Time Ecosystem (Socket.io) ⚡
+**Status**: ☑️ DONE (Feb 7)
+
+**What was done**:
+- **Infrastructure**: Integrated Socket.io with Hybrid Adapter (Redis for Scale / Memory for Dev).
+- **Events**: `order:created` (POS Alert), `stock:low` (Dashboard).
+- **Security**: JWT Auth Middleware with `verifyAccessToken`.
+- **Optimization**: Singleton Pattern for resource efficiency.
+
+### 17. POS Auto-Invoice Generation 🧾
+**Status**: ☑️ DONE (Feb 7)
+
+**What was done**:
+- **Logic**: Automatically creates `PharmacyInvoice` for any Order with `isPosSale: true` and `status: PAID`.
+- **Validation**: Ensures financial records (Invoice) match physical transactions (Order) 1:1.
+
+---
+
 ## 14. Known Limitations & Tech Debt (Deferred)
 Các vấn đề sau đã được nhận diện nhưng quyết định **Skip** (Chưa sửa ngay) vì không ảnh hưởng nghiêm trọng ở quy mô hiện tại:
 
