@@ -1,0 +1,543 @@
+==================================================
+PHARMAECO - RELATIONAL SCHEMA DOCUMENTATION
+==================================================
+
+This document contains the relational schema documentation for the PharmaEco 
+multi-tenant pharmacy management system. The schema is designed with PostgreSQL 
+as the underlying database, managed through Prisma ORM.
+
+==================================================
+PART 1: SCHEMA OVERVIEW
+==================================================
+
+Total Tables: 33 entities + 14 enums
+Architecture: Multi-tenant SaaS with tenant isolation via pharmacy_id
+Primary Key Strategy: CUID (Collision-resistant Unique Identifier)
+
+==================================================
+PART 2: CLUSTER ORGANIZATION
+==================================================
+
+The schema is organized into 6 logical clusters plus 1 standalone entity:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLUSTER 1: Identity & Access Management (IAM) - 7 Tables                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Owner, Pharmacy, PharmacyStaff, SystemAdmin, RefreshToken, AuditLog, Otp   │
+│                                                                             │
+│ Focus: Authentication, Authorization, Session Management, Audit Trail      │
+│ Security Features: JWT rotation, Kill Switch, Immutable audit logs         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLUSTER 2: Global Catalog & Supplier Network - 5 Tables                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ GlobalMedicineCatalog, Supplier, PharmaSalesRep, Category, Brand           │
+│                                                                             │
+│ Focus: Master Data Management, Supply Chain Integration                     │
+│ Features: Approval workflow (PENDING → APPROVED), CSV import sanitization   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLUSTER 3: Inventory & Procurement - 6 Tables                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ PharmacyInventory, InventoryBatch, InventoryUnit, StorageLocation,         │
+│ PurchaseInvoice, PurchaseItem                                               │
+│                                                                             │
+│ Focus: Stock Management, Batch Tracking, Purchase Orders                    │
+│ Features: FIFO/FEFO logic, Soft delete pattern, Unit conversion             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLUSTER 4: Sales & Financial (Order-to-Cash) - 7 Tables                     │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ PharmacyOrder, OrderItem, Payment, Delivery, PharmacyInvoice,              │
+│ InvoiceItem, PharmacyAnalytics                                              │
+│                                                                             │
+│ Focus: Sales Transactions, Payment Processing, Revenue Analytics            │
+│ Features: Snapshot pricing (cost_price), Materialized analytics             │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLUSTER 5: Patient Profile & Health (CRM) - 6 Tables                        │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ Customer, CustomerHealthMetrics, CustomerAllergy, CustomerHealthRecord,    │
+│ CustomerCart, CartItem                                                      │
+│                                                                             │
+│ Focus: Patient Data, Health Records, Shopping Experience                    │
+│ Compliance: HIPAA-ready design, Encrypted health data at rest               │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ CLUSTER 6: Medication Adherence & Notifications - 6 Tables                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ MedicineReminder, ReminderNotification, ReminderLog,                       │
+│ CustomerNotification, CustomerPushToken, StaffNotification                  │
+│                                                                             │
+│ Focus: Reminder Scheduling, Push Notifications, Adherence Tracking          │
+│ Features: Background workers (scheduler, missed-check), Real-time updates   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ STANDALONE: Content Management - 1 Table                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ News                                                                        │
+│                                                                             │
+│ Focus: Health news and articles for customer app                            │
+│ Note: No foreign key dependencies, independent entity                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+
+==================================================
+PLANTUML: HIGH-LEVEL SCHEMA OVERVIEW (ABSTRACT)
+==================================================
+
+@startuml
+!theme plain
+top to bottom direction
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam classFontSize 11
+skinparam packageFontSize 12
+skinparam nodesep 40
+skinparam ranksep 60
+hide circle
+hide empty members
+
+title PharmaEco - Relational Schema Overview\n33 Tables in 6 Clusters
+
+' =====================================
+' CLUSTER 1: IAM & SECURITY
+' =====================================
+package "IAM & Security" as IAM #E3F2FD {
+    class SystemAdmin
+    class Owner
+    class Pharmacy
+    class PharmacyStaff
+    class RefreshToken
+    class AuditLog
+    class Otp
+}
+
+' =====================================
+' CLUSTER 2: GLOBAL CATALOG & SUPPLIER
+' =====================================
+package "Global Catalog & Supplier" as CAT #F3E5F5 {
+    class GlobalMedicineCatalog
+    class Supplier
+    class PharmaSalesRep
+    class Category
+    class Brand
+}
+
+' =====================================
+' CLUSTER 3: INVENTORY & PROCUREMENT
+' =====================================
+package "Inventory & Procurement" as INV #E8F5E9 {
+    class PharmacyInventory
+    class InventoryBatch
+    class InventoryUnit
+    class StorageLocation
+    class PurchaseInvoice
+    class PurchaseItem
+}
+
+' =====================================
+' CLUSTER 4: SALES & FINANCIAL
+' =====================================
+package "Sales & Financial" as FIN #FFEBEE {
+    class PharmacyOrder
+    class OrderItem
+    class Payment
+    class Delivery
+    class PharmacyInvoice
+    class InvoiceItem
+    class PharmacyAnalytics
+}
+
+' =====================================
+' CLUSTER 5: PATIENT PROFILE & HEALTH
+' =====================================
+package "Patient Profile & Health" as CRM #FCE4EC {
+    class Customer
+    class CustomerHealthMetrics
+    class CustomerAllergy
+    class CustomerHealthRecord
+    class CustomerCart
+    class CartItem
+}
+
+' =====================================
+' CLUSTER 6: ADHERENCE & NOTIFICATIONS
+' =====================================
+package "Adherence & Notifications" as NOTIF #FFF3E0 {
+    class MedicineReminder
+    class ReminderNotification
+    class ReminderLog
+    class CustomerNotification
+    class CustomerPushToken
+    class StaffNotification
+}
+
+' =====================================
+' STANDALONE
+' =====================================
+package "Content" as CONTENT #ECEFF1 {
+    class News
+}
+
+' =====================================
+' INTRA-CLUSTER RELATIONSHIPS
+' =====================================
+
+' --- IAM ---
+Owner "1" --> "*" Pharmacy
+Pharmacy "1" --> "*" PharmacyStaff
+Pharmacy "1" --> "*" AuditLog
+Pharmacy "1" --> "*" StorageLocation
+Owner "1" --> "*" RefreshToken
+PharmacyStaff "1" --> "*" RefreshToken
+SystemAdmin "1" --> "*" RefreshToken
+
+' --- Catalog ---
+Supplier "1" --> "*" PharmaSalesRep
+Supplier "1" --> "*" GlobalMedicineCatalog
+PharmaSalesRep "1" --> "*" GlobalMedicineCatalog
+Category "1" --> "*" GlobalMedicineCatalog
+Brand "1" --> "*" GlobalMedicineCatalog
+
+' --- Inventory ---
+PharmacyInventory "1" --> "*" InventoryBatch
+PharmacyInventory "1" --> "*" InventoryUnit
+PurchaseInvoice "1" --> "*" PurchaseItem
+
+' --- Sales ---
+PharmacyOrder "1" --> "*" OrderItem
+PharmacyOrder "1" --> "0..1" Payment
+PharmacyOrder "1" --> "0..1" Delivery
+PharmacyOrder "1" --> "0..1" PharmacyInvoice
+PharmacyInvoice "1" --> "*" InvoiceItem
+
+' --- Patient ---
+Customer "1" --> "0..1" CustomerHealthMetrics
+Customer "1" --> "*" CustomerAllergy
+Customer "1" --> "*" CustomerHealthRecord
+Customer "1" --> "0..1" CustomerCart
+CustomerCart "1" --> "*" CartItem
+
+' --- Adherence ---
+Customer "1" --> "*" MedicineReminder
+MedicineReminder "1" --> "*" ReminderNotification
+MedicineReminder "1" --> "*" ReminderLog
+Customer "1" --> "*" CustomerNotification
+Customer "1" --> "*" CustomerPushToken
+PharmacyStaff "1" --> "*" StaffNotification
+
+
+' =====================================
+' CROSS-CLUSTER RELATIONSHIPS
+' =====================================
+' Using specific directions (down/up/left/right) to guide layout
+
+' IAM (Pharmacy) down to Inventory
+Pharmacy "1" -down-> "*" PharmacyInventory
+Pharmacy "1" -down-> "*" PurchaseInvoice
+
+' IAM (Pharmacy) down to Sales
+Pharmacy "1" -down-> "*" PharmacyOrder
+Pharmacy "1" -down-> "*" PharmacyInvoice
+Pharmacy "1" -down-> "*" Delivery
+Pharmacy "1" -down-> "*" PharmacyAnalytics
+
+' Catalog (GMC) used by Inventory
+GlobalMedicineCatalog "0..1" <-- "*" PharmacyInventory : references
+
+' Inventory items used in Sales (Order/Invoice)
+PharmacyInventory "1" <-- "*" OrderItem
+PharmacyInventory "0..1" <-- "*" InvoiceItem
+PharmacyInventory "1" <-- "*" CartItem
+
+' Patient down to Sales
+Customer "1" -down-> "*" PharmacyOrder
+Customer "1" -down-> "*" PharmacyInvoice
+
+' Patient down to Adherence
+Customer "1" -down-> "*" ReminderLog
+
+' =====================================
+' LAYOUT HINTS (FORCED VERTICAL)
+' =====================================
+' Connect representative nodes from each cluster to force vertical alignment
+
+Pharmacy -[hidden]down-> GlobalMedicineCatalog
+GlobalMedicineCatalog -[hidden]down-> PharmacyInventory
+PharmacyInventory -[hidden]down-> PharmacyOrder
+PharmacyOrder -[hidden]down-> Customer
+Customer -[hidden]down-> MedicineReminder
+MedicineReminder -[hidden]down-> News
+
+@enduml
+
+==================================================
+PART 3: CLUSTER DETAILS
+==================================================
+
+CLUSTER 1: IDENTITY & ACCESS MANAGEMENT
+---------------------------------------
+Tables: 7
+- owners: Pharmacy chain owners (subscription-based)
+- pharmacies: Physical pharmacy locations (tenant unit)
+- pharmacy_staff: Staff members with role-based access
+- system_admins: Platform administrators (elevated privileges)
+- refresh_tokens: JWT token rotation with polymorphic FK
+- audit_logs: Immutable security trail (no UPDATE/DELETE)
+- otps: One-time passwords for phone verification
+
+Key Relationships:
+- Owner 1:N Pharmacy (one owner can have multiple pharmacies)
+- Pharmacy 1:N PharmacyStaff (employees belong to a pharmacy)
+- RefreshToken N:1 Owner|Staff|Customer|Admin (polymorphic)
+
+Security Highlights:
+- Kill Switch: Owner.status = SUSPENDED triggers global ban
+- Token Rotation: replaced_by field prevents token reuse attacks
+- Audit Trail: IMMUTABLE records for compliance
+
+
+CLUSTER 2: GLOBAL CATALOG & SUPPLIER NETWORK
+---------------------------------------------
+Tables: 5
+- global_medicine_catalog: Central drug database (approval required)
+- suppliers: Pharmaceutical suppliers
+- pharma_sales_reps: Supplier representatives (CSV uploaders)
+- categories: Drug categories (e.g., Antibiotics, Pain Relief)
+- brands: Pharmaceutical brands with logos
+
+Key Relationships:
+- Supplier 1:N PharmaSalesRep (reps work for suppliers)
+- Supplier 1:N GlobalMedicineCatalog (suppliers provide drugs)
+- Category 1:N GlobalMedicineCatalog (categorization)
+- Brand 1:N GlobalMedicineCatalog (branding)
+
+Approval Workflow:
+1. Rep uploads CSV → status = PENDING
+2. Owner reviews entries
+3. APPROVED → visible in pharmacy inventory import
+
+
+CLUSTER 3: INVENTORY & PROCUREMENT
+-----------------------------------
+Tables: 6
+- pharmacy_inventory: Stock items per pharmacy
+- inventory_batches: Lot tracking with expiry dates
+- inventory_units: Unit conversion (Box → Strip → Pill)
+- storage_locations: Physical storage areas
+- purchase_invoices: Incoming stock invoices
+- purchase_items: Line items for purchases
+
+Key Relationships:
+- PharmacyInventory 1:N InventoryBatch (FIFO/FEFO tracking)
+- PharmacyInventory 1:N InventoryUnit (multiple selling units)
+- PurchaseInvoice 1:N PurchaseItem (invoice details)
+
+FIFO/FEFO Logic:
+- Batches sorted by expiry_date ASC
+- Oldest expiring batch sold first
+- purchase_price captured for COGS calculation
+
+
+CLUSTER 4: SALES & FINANCIAL
+-----------------------------
+Tables: 7
+- pharmacy_orders: Customer orders
+- order_items: Line items with SNAPSHOT pricing
+- payments: Payment transactions
+- deliveries: Delivery tracking
+- pharmacy_invoices: Sales invoices (ONLINE/OFFLINE)
+- invoice_items: Invoice line items
+- pharmacy_analytics: Pre-computed daily metrics
+
+Key Relationships:
+- PharmacyOrder 1:N OrderItem (order details)
+- PharmacyOrder 1:1 Payment (payment processing)
+- PharmacyOrder 1:1 Delivery (fulfillment)
+- PharmacyOrder 1:1 PharmacyInvoice (billing)
+
+Snapshot Pricing (CRITICAL):
+- OrderItem.cost_price = purchase_price at transaction time
+- IMMUTABLE after order confirmation
+- Enables accurate profit calculation even after batch deletion
+
+
+CLUSTER 5: PATIENT PROFILE & HEALTH
+------------------------------------
+Tables: 6
+- customers: Patient accounts (phone-based auth)
+- customer_health_metrics: Vital signs and BMI
+- customer_allergies: Drug allergy records
+- customer_health_records: Medical documents
+- customer_carts: Shopping carts
+- cart_items: Cart line items
+
+Key Relationships:
+- Customer 1:1 CustomerHealthMetrics (one profile per customer)
+- Customer 1:N CustomerAllergy (multiple allergies)
+- Customer 1:N CustomerHealthRecord (medical history)
+- Customer 1:1 CustomerCart (one active cart)
+
+HIPAA Considerations:
+- Health data encrypted at rest
+- Password hashed with bcrypt
+- Phone verified via OTP
+
+
+CLUSTER 6: MEDICATION ADHERENCE & NOTIFICATIONS
+------------------------------------------------
+Tables: 6
+- medicine_reminders: Medication schedules
+- reminder_notifications: Scheduled push notifications
+- reminder_logs: Adherence tracking (taken/skipped/missed)
+- customer_notifications: General customer alerts
+- customer_push_tokens: Device tokens (Expo/FCM)
+- staff_notifications: Staff alerts (orders, inventory, etc.)
+
+Key Relationships:
+- MedicineReminder 1:N ReminderNotification (scheduled alerts)
+- MedicineReminder 1:N ReminderLog (adherence history)
+- Customer 1:N CustomerPushToken (multiple devices)
+
+Background Workers:
+- scheduler.worker: Runs every 60 seconds
+- missed-check.worker: Runs every 300 seconds
+- Adherence Rate = taken / (taken + missed)
+
+
+STANDALONE: NEWS
+-----------------
+Tables: 1
+- news: Health articles and announcements
+
+Note: No foreign key dependencies. Independent content management.
+
+
+==================================================
+PART 4: LATEX DOCUMENTATION
+==================================================
+
+\subsubsection{Relational Schema}
+
+A relational schema defines the structure of a relational database, organizing data into tables and establishing relationships between them. The schema serves as a blueprint for data storage, ensuring referential integrity and enabling efficient query operations.
+
+% === HIGH-LEVEL OVERVIEW ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=1\linewidth]{images/schema_overview.png}
+    \caption{High-Level Relational Schema Overview}
+    \label{fig:schema-overview}
+\end{figure}
+
+Fig \ref{fig:schema-overview} presents the high-level relational schema for the PharmaEco system, illustrating the connections among thirty-three entities organized into six logical clusters. The schema employs PostgreSQL as the underlying database with CUID (Collision-resistant Unique Identifier) as the primary key strategy for horizontal scalability.
+
+The database tables are organized into the following clusters:
+
+\begin{itemize}
+    \item \textbf{Identity \& Access Management (IAM):} owners, pharmacies, pharmacy\_staff, system\_admins, refresh\_tokens, audit\_logs, otps --- responsible for authentication, authorization, session management, and security audit trails.
+    
+    \item \textbf{Global Catalog \& Supplier Network:} global\_medicine\_catalog, suppliers, pharma\_sales\_reps, categories, brands --- master data management for pharmaceutical products and supply chain integration.
+    
+    \item \textbf{Inventory \& Procurement:} pharmacy\_inventory, inventory\_batches, inventory\_units, storage\_locations, purchase\_invoices, purchase\_items --- stock management with FIFO/FEFO batch tracking and unit conversion.
+    
+    \item \textbf{Sales \& Financial:} pharmacy\_orders, order\_items, payments, deliveries, pharmacy\_invoices, invoice\_items, pharmacy\_analytics --- order-to-cash workflow with snapshot pricing for accounting integrity.
+    
+    \item \textbf{Patient Profile \& Health:} customers, customer\_health\_metrics, customer\_allergies, customer\_health\_records, customer\_carts, cart\_items --- HIPAA-ready patient data management and shopping experience.
+    
+    \item \textbf{Medication Adherence \& Notifications:} medicine\_reminders, reminder\_notifications, reminder\_logs, customer\_notifications, customer\_push\_tokens, staff\_notifications --- real-time notification system with background worker support.
+\end{itemize}
+
+% === CLUSTER 1: IAM ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images/schema_cluster1_iam.png}
+    \caption{Schema Cluster 1: Identity \& Access Management}
+    \label{fig:schema-cluster1}
+\end{figure}
+
+Fig \ref{fig:schema-cluster1} details the IAM cluster, which implements multi-tenant isolation through the \texttt{pharmacy\_id} foreign key. The \texttt{refresh\_tokens} table employs a polymorphic design, linking to owners, staff, customers, or admins via optional foreign keys. The \texttt{audit\_logs} table is designed as an append-only structure (no UPDATE or DELETE operations) to maintain compliance with security requirements.
+
+% === CLUSTER 2: CATALOG ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images/schema_cluster2_catalog.png}
+    \caption{Schema Cluster 2: Global Catalog \& Supplier Network}
+    \label{fig:schema-cluster2}
+\end{figure}
+
+Fig \ref{fig:schema-cluster2} illustrates the master data cluster. The \texttt{global\_medicine\_catalog} table requires an approval workflow (PENDING → APPROVED → visible) to ensure data quality. Sales representatives upload product data via CSV, with sanitization logic preventing formula injection attacks.
+
+% === CLUSTER 3: INVENTORY ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images/schema_cluster3_inventory.png}
+    \caption{Schema Cluster 3: Inventory \& Procurement}
+    \label{fig:schema-cluster3}
+\end{figure}
+
+Fig \ref{fig:schema-cluster3} shows the inventory management structure. The \texttt{inventory\_batches} table supports FIFO/FEFO (First-In-First-Out / First-Expired-First-Out) logic through indexed queries on \texttt{expiry\_date}. The \texttt{inventory\_units} table enables flexible unit conversion (e.g., Box = 10 Strips, Strip = 10 Pills).
+
+% === CLUSTER 4: SALES ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images/schema_cluster4_sales.png}
+    \caption{Schema Cluster 4: Sales \& Financial}
+    \label{fig:schema-cluster4}
+\end{figure}
+
+Fig \ref{fig:schema-cluster4} presents the order-to-cash workflow. A critical design decision is the \texttt{cost\_price} field in \texttt{order\_items}, which captures the purchase price at transaction time (snapshot pricing). This ensures accurate profit calculations even if the source batch is later deleted, maintaining accounting integrity.
+
+% === CLUSTER 5: PATIENT ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images/schema_cluster5_patient.png}
+    \caption{Schema Cluster 5: Patient Profile \& Health}
+    \label{fig:schema-cluster5}
+\end{figure}
+
+Fig \ref{fig:schema-cluster5} displays the patient data structure. The \texttt{customer\_health\_metrics} table stores calculated fields such as BMI and BMR. Health records support file attachments via Cloudinary integration. All sensitive health data is encrypted at rest to comply with healthcare data protection requirements.
+
+% === CLUSTER 6: ADHERENCE ===
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{images/schema_cluster6_adherence.png}
+    \caption{Schema Cluster 6: Medication Adherence \& Notifications}
+    \label{fig:schema-cluster6}
+\end{figure}
+
+Fig \ref{fig:schema-cluster6} illustrates the medication adherence system. The \texttt{medicine\_reminders} table supports flexible scheduling (daily, specific days, or interval-based). Background workers process \texttt{reminder\_notifications} to send push notifications via Expo Push Service. The \texttt{reminder\_logs} table tracks patient actions (taken, skipped, or missed) for adherence rate calculation.
+
+The schema design prioritizes:
+\begin{itemize}
+    \item \textbf{Multi-tenancy:} Tenant isolation via \texttt{pharmacy\_id} foreign keys
+    \item \textbf{Horizontal Scalability:} CUID primary keys and stateless design
+    \item \textbf{Data Integrity:} Snapshot pricing and immutable audit logs
+    \item \textbf{Healthcare Compliance:} HIPAA-ready patient data encryption
+    \item \textbf{Performance:} Strategic indexing and materialized analytics
+\end{itemize}
+
+
+==================================================
+PART 5: SUMMARY TABLE
+==================================================
+
+| Cluster | Name                          | Tables | Key Features                          |
+|---------|-------------------------------|--------|---------------------------------------|
+| 1       | IAM & Security                | 7      | Kill Switch, Token Rotation, Audit    |
+| 2       | Global Catalog & Supplier     | 5      | Approval Workflow, CSV Sanitization   |
+| 3       | Inventory & Procurement       | 6      | FIFO/FEFO, Unit Conversion            |
+| 4       | Sales & Financial             | 7      | Snapshot Pricing, Analytics           |
+| 5       | Patient Profile & Health      | 6      | HIPAA-ready, Encrypted Health Data    |
+| 6       | Adherence & Notifications     | 6      | Background Workers, Push Notifications|
+| -       | Standalone (News)             | 1      | Independent Content Management        |
+|---------|-------------------------------|--------|---------------------------------------|
+| TOTAL   |                               | 33     |                                       |
+

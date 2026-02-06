@@ -1,280 +1,214 @@
-import { PrismaClient, OwnerStatus, StaffRole } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { PrismaClient, StaffRole, CatalogStatus } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+// --- CONFIGURATION ---
+const GLOBAL_CATALOG_SIZE = 10000; // Target: 10k items
+const BATCH_SIZE = 1000; // Chunk size for createMany
+
+// --- DATA GENERATORS ---
+const PREFIXES = ['Panadol', 'Amoxicillin', 'Vitamin', 'Omega-3', 'Ibuprofen', 'Paracetamol', 'Ceffixime', 'Berberin', 'Gingko Biloba', 'Calcium'];
+const SUFFIXES = ['Extra', 'Forte', '500mg', 'Kids', 'Plus', 'Gold', 'Premium', 'Rapid Release', 'Sustained Release', 'Liquid'];
+const MANUFACTURERS = ['GSK', 'Pfizer', 'Sanofi', 'Novartis', 'Bayer', 'Zuellig Pharma', 'DHG Pharma', 'Traphaco'];
+
+function getRandomItem<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateMedicineName(index: number) {
+    return `${getRandomItem(PREFIXES)} ${getRandomItem(SUFFIXES)} ${index}`;
+}
+
 async function main() {
-    console.log('🌱 Starting MASTER Seeding Process...');
+    console.log('🚀 STARTING BIG DATA SEEDING (THESIS MODE)...');
 
-    // 1. CLEANUP (Dọn dẹp dữ liệu cũ theo thứ tự để tránh lỗi khóa ngoại)
-    const deleteOrder = [
-        prisma.reminderLog.deleteMany(),
-        prisma.reminderNotification.deleteMany(),
-        prisma.medicineReminder.deleteMany(),
-        prisma.orderItem.deleteMany(),
-        prisma.invoiceItem.deleteMany(),
-        prisma.cartItem.deleteMany(),
-        prisma.inventoryBatch.deleteMany(),
-        prisma.inventoryUnit.deleteMany(),
-        prisma.purchaseItem.deleteMany(),
-        prisma.purchaseInvoice.deleteMany(),
-        prisma.pharmacyInventory.deleteMany(),
-        prisma.pharmacyOrder.deleteMany(),
-        prisma.pharmacyInvoice.deleteMany(),
-        prisma.staffNotification.deleteMany(),
-        prisma.pharmacyStaff.deleteMany(),
-        prisma.storageLocation.deleteMany(),
-        prisma.pharmacy.deleteMany(),
-        prisma.owner.deleteMany(),
-        prisma.globalMedicineCatalog.deleteMany(),
-        prisma.pharmaSalesRep.deleteMany(),
-        prisma.supplier.deleteMany(),
-        prisma.category.deleteMany(),
-        prisma.brand.deleteMany(),
-        prisma.systemAdmin.deleteMany(),
-    ];
+    // 1. CLEANUP (Careful!)
+    console.log('🧹 Cleaning old data...');
+    // Order matters due to FKs
+    await prisma.purchaseItem.deleteMany();
+    await prisma.purchaseInvoice.deleteMany();
+    await prisma.invoiceItem.deleteMany();
+    await prisma.pharmacyInvoice.deleteMany();
+    await prisma.cartItem.deleteMany();
+    await prisma.customerCart.deleteMany();
+    await prisma.orderItem.deleteMany();
+    await prisma.pharmacyOrder.deleteMany();
+    await prisma.inventoryBatch.deleteMany();
+    await prisma.inventoryUnit.deleteMany();
+    await prisma.pharmacyInventory.deleteMany();
+    await prisma.staffNotification.deleteMany();
+    await prisma.pharmacyStaff.deleteMany();
+    await prisma.pharmacy.deleteMany();
+    await prisma.owner.deleteMany();
+    await prisma.globalMedicineCatalog.deleteMany();
+    await prisma.pharmaSalesRep.deleteMany();
+    await prisma.supplier.deleteMany();
+    await prisma.brand.deleteMany();
+    await prisma.category.deleteMany();
 
-    await prisma.$transaction(deleteOrder);
-    console.log('🧹 Database cleaned successfully.');
-
-    // 2. TẠO SYSTEM ADMIN (GOD MODE)
-    const adminPassword = await bcrypt.hash('admin123', 12);
-    await prisma.systemAdmin.create({
-        data: {
-            email: 'admin@pharmacy-saas.com',
-            password: adminPassword,
-            name: 'Super Admin (Mẹ Thư)',
-        },
-    });
-    console.log('👑 System Admin created: admin@pharmacy-saas.com / admin123');
-
-    // 3. TẠO GLOBAL DATA (Danh mục dùng chung)
-    // Category
-    const catPain = await prisma.category.create({ data: { name: 'Giảm Đau / Hạ Sốt' } });
-    const catAnti = await prisma.category.create({ data: { name: 'Kháng Sinh' } });
-    console.log('📁 Categories created.');
-
-    // Supplier
-    const supplier = await prisma.supplier.create({
-        data: {
-            name: 'Dược Hậu Giang (DHG)',
-            address: 'Cần Thơ',
-            contactInfo: { phone: '0292-3890-890', email: 'info@dhgpharma.vn' }
-        },
-    });
-    console.log('🏭 Supplier created: DHG Pharma');
-
-    // PharmaSalesRep - PHẢI TẠO TRƯỚC KHI TẠO CATALOG
-    const salesRep = await prisma.pharmaSalesRep.create({
-        data: {
-            name: 'Nguyễn Văn Sales',
-            email: 'sales@dhgpharma.vn',
-            phone: '0901234567',
-            supplierId: supplier.id,
-        },
-    });
-    console.log('👔 Pharma Sales Rep created.');
-
-    // Global Catalog (Thuốc mẫu)
-    const panadol = await prisma.globalMedicineCatalog.create({
-        data: {
-            name: 'Panadol Extra',
-            manufacturer: 'GSK',
-            activeIngredient: 'Paracetamol 500mg, Caffeine 65mg',
-            packaging: 'Hộp 15 vỉ x 12 viên',
-            unitPrice: 180000,
-            categoryId: catPain.id,
-            supplierId: supplier.id,
-            pharmaRepId: salesRep.id, // ✅ Dùng ID thực
-        },
+    // 2. MASTER DATA (Suppliers, Categories, Brands)
+    console.log('🏭 Seeding Master Data...');
+    await prisma.supplier.createMany({
+        data: MANUFACTURERS.map(name => ({
+            name,
+            address: 'Global HQ',
+            contactInfo: { phone: '1900-1000' }
+        }))
     });
 
-    const augmentin = await prisma.globalMedicineCatalog.create({
-        data: {
-            name: 'Augmentin 625mg',
-            manufacturer: 'GSK',
-            activeIngredient: 'Amoxicillin, Clavulanic acid',
-            packaging: 'Hộp 2 vỉ x 7 viên',
-            unitPrice: 200000,
-            categoryId: catAnti.id,
-            supplierId: supplier.id,
-            pharmaRepId: salesRep.id, // ✅ Dùng ID thực
-        },
+    // Fetch IDs back 
+    const supplierRecords = await prisma.supplier.findMany();
+    const supplierIds = supplierRecords.map(s => s.id);
+
+    await prisma.category.createMany({
+        data: ['Pain Relief', 'Antibiotics', 'Supplements', 'Cardiovascular', 'Respiratory', 'Digestion'].map(name => ({ name }))
     });
-    console.log('📚 Global Catalog seeded (Panadol, Augmentin).');
+    const categoryRecords = await prisma.category.findMany();
+    const categoryIds = categoryRecords.map(c => c.id);
 
-    // 4. TẠO OWNER & PHARMACY & INVENTORY (Dữ liệu Tenant)
-    const userPassword = await bcrypt.hash('123456', 10);
+    // 3. GLOBAL CATALOG (10,000 Items)
+    console.log(`💊 Generating ${GLOBAL_CATALOG_SIZE} Global Medicines...`);
 
-    // Tạo Owner đã được Approve
-    const owner = await prisma.owner.create({
+    // Fix: Create a dummy Rep
+    const rep = await prisma.pharmaSalesRep.create({
         data: {
-            email: 'owner@gmail.com',
-            password: userPassword,
-            name: 'Nguyễn Văn Chủ',
-            phone: '0909111222',
-            status: OwnerStatus.ACTIVE, // Active để demo ngay!
-            subscriptionExpiry: new Date('2030-01-01'),
+            name: 'Thesis Rep',
+            email: 'rep@thesis.com',
+            phone: '0909000000',
+            supplierId: supplierIds[0]
         }
     });
-    console.log('👤 Owner created: owner@gmail.com / 123456');
 
-    // Tạo Pharmacy
-    const pharmacy = await prisma.pharmacy.create({
-        data: {
-            ownerId: owner.id,
-            name: 'Nhà Thuốc An Khang 1',
-            address: '123 Cách Mạng Tháng 8, Q3, TP.HCM',
-            phone: '0909123456',
-            latitude: 10.7769,
-            longitude: 106.6951,
-            hours: {
-                monday: '08:00-22:00',
-                tuesday: '08:00-22:00',
-                wednesday: '08:00-22:00',
-                thursday: '08:00-22:00',
-                friday: '08:00-22:00',
-                saturday: '08:00-20:00',
-                sunday: '09:00-18:00'
-            },
-        },
-    });
-    console.log('🏪 Pharmacy created: Nhà Thuốc An Khang 1');
+    const catalogData = [];
+    for (let i = 0; i < GLOBAL_CATALOG_SIZE; i++) {
+        catalogData.push({
+            name: generateMedicineName(i),
+            manufacturer: getRandomItem(MANUFACTURERS),
+            description: 'Generated for Thesis Benchmark',
+            supplierId: getRandomItem(supplierIds),
+            categoryId: getRandomItem(categoryIds),
+            pharmaRepId: rep.id,
+            unitPrice: 5000 + Math.floor(Math.random() * 500000),
+            status: CatalogStatus.APPROVED,
+            activeIngredient: 'Placebo'
+        });
+    }
 
-    // Tạo Staff
-    await prisma.pharmacyStaff.create({
-        data: {
-            pharmacyId: pharmacy.id,
-            name: 'Trần Quản Lý',
-            email: 'manager@pharmacy.com',
-            password: userPassword,
-            username: 'manager',
-            role: StaffRole.MANAGER,
-        },
-    });
+    // Chunk Insert
+    /* 
+       Using createMany is fast.
+    */
+    const chunks = [];
+    for (let i = 0; i < catalogData.length; i += BATCH_SIZE) {
+        const chunk = catalogData.slice(i, i + BATCH_SIZE);
+        chunks.push(chunk);
+    }
 
-    await prisma.pharmacyStaff.create({
-        data: {
-            pharmacyId: pharmacy.id,
-            name: 'Lê Dược Sĩ',
-            email: 'pharmacist@pharmacy.com',
-            password: userPassword,
-            username: 'pharmacist',
-            role: StaffRole.PHARMACIST,
-        },
-    });
-    console.log('👥 Staff created: manager@pharmacy.com, pharmacist@pharmacy.com / 123456');
+    for (const [idx, chunk] of chunks.entries()) {
+        await prisma.globalMedicineCatalog.createMany({ data: chunk });
+        console.log(`   Processed Chunk ${idx + 1}/${chunks.length}`);
+    }
 
-    // Tạo Inventory + Batches (Quan trọng cho FIFO testing!)
-    // Thuốc 1: Panadol với 2 lô
-    const inventoryPanadol = await prisma.pharmacyInventory.create({
-        data: {
-            pharmacyId: pharmacy.id,
-            name: 'Panadol Extra (Tại kho)',
-            globalCatalogId: panadol.id,
-            categoryId: catPain.id,
-            totalStockLevel: 1500,
-            minStockLevel: 100,
-            image: 'https://placehold.co/400x400/FF0000/FFFFFF?text=Panadol',
-        },
-    });
+    // Fetch all Catalog IDs for Inventory distribution
+    const allCatalogItems = await prisma.globalMedicineCatalog.findMany({ select: { id: true, name: true, unitPrice: true } });
+    console.log(`✅ ${allCatalogItems.length} Medicines Created.`);
 
-    // Tạo Units cho Panadol
-    await prisma.inventoryUnit.createMany({
-        data: [
-            { inventoryId: inventoryPanadol.id, name: 'Hộp', conversionFactor: 180, price: 250000, isBaseUnit: false },
-            { inventoryId: inventoryPanadol.id, name: 'Vỉ', conversionFactor: 12, price: 20000, isBaseUnit: false, isDefaultSelling: true },
-            { inventoryId: inventoryPanadol.id, name: 'Viên', conversionFactor: 1, price: 2000, isBaseUnit: true },
-        ],
-    });
+    // 4. OWNERS & PHARMACIES
+    console.log('👥 Creating Owners & Pharmacies...');
+    const passwordHash = await bcrypt.hash('123456', 10);
 
-    // Tạo Batches cho Panadol (TEST FIFO!)
-    await prisma.inventoryBatch.createMany({
-        data: [
-            {
-                inventoryId: inventoryPanadol.id,
-                batchCode: 'LÔ-CŨ-2025',
-                expiryDate: new Date('2026-05-01'), // Sắp hết hạn -> Xuất trước!
-                stockQuantity: 500,
-                purchasePrice: 150000, // Giá vốn rẻ
-            },
-            {
-                inventoryId: inventoryPanadol.id,
-                batchCode: 'LÔ-MỚI-2026',
-                expiryDate: new Date('2028-01-01'), // Còn hạn lâu -> Xuất sau
-                stockQuantity: 1000,
-                purchasePrice: 180000, // Giá vốn đắt hơn (Test Snapshot Pricing)
-            },
-        ],
-    });
+    const owners = [
+        { name: 'Nguyen Van Ty Phus (Big Corp)', email: 'typhu@pharmacy.com', pharmacies: 2 },
+        { name: 'Tran Van SME', email: 'sme@pharmacy.com', pharmacies: 1 },
+        { name: 'Le Thi Startup', email: 'startup@pharmacy.com', pharmacies: 1 },
+    ];
 
-    // Thuốc 2: Augmentin (Cố tình để minStock > totalStock để test cảnh báo)
-    const inventoryAugmentin = await prisma.pharmacyInventory.create({
-        data: {
-            pharmacyId: pharmacy.id,
-            name: 'Augmentin 625mg (Tại kho)',
-            globalCatalogId: augmentin.id,
-            categoryId: catAnti.id,
-            totalStockLevel: 50, // Ít hơn minStock!
-            minStockLevel: 100, // Trigger Low Stock Alert
-            image: 'https://placehold.co/400x400/0000FF/FFFFFF?text=Augmentin',
-        },
-    });
+    for (const o of owners) {
+        const owner = await prisma.owner.create({
+            data: {
+                name: o.name,
+                email: o.email,
+                password: passwordHash,
+                status: 'ACTIVE',
+                phone: '0901234567'
+            }
+        });
 
-    await prisma.inventoryUnit.create({
-        data: {
-            inventoryId: inventoryAugmentin.id,
-            name: 'Hộp',
-            conversionFactor: 1,
-            price: 250000,
-            isBaseUnit: true,
-        },
-    });
+        for (let i = 0; i < o.pharmacies; i++) {
+            const pharmacy = await prisma.pharmacy.create({
+                data: {
+                    ownerId: owner.id,
+                    name: `${o.name} - Branch ${i + 1}`,
+                    address: `Street ${i}, District ${i + 1}, HCMC`,
+                    phone: `0283${i}00000`,
+                    hours: { open: '08:00', close: '22:00' },
+                    latitude: 10.7 + i * 0.01,
+                    longitude: 106.6 + i * 0.01
+                }
+            });
 
-    await prisma.inventoryBatch.create({
-        data: {
-            inventoryId: inventoryAugmentin.id,
-            batchCode: 'AUG-001',
-            expiryDate: new Date('2027-01-01'),
-            stockQuantity: 50,
-            purchasePrice: 200000,
-        },
-    });
+            // 5. STAFF (3 per Pharmacy)
+            await prisma.pharmacyStaff.createMany({
+                data: [
+                    { pharmacyId: pharmacy.id, name: 'Manager A', email: `manager.${pharmacy.id}@p.com`, role: StaffRole.MANAGER, username: `m_${pharmacy.id.substring(0, 4)}`, password: passwordHash },
+                    { pharmacyId: pharmacy.id, name: 'Pharmacist B', email: `pharmacist.${pharmacy.id}@p.com`, role: StaffRole.PHARMACIST, username: `p_${pharmacy.id.substring(0, 4)}`, password: passwordHash },
+                    { pharmacyId: pharmacy.id, name: 'Intern C', email: `intern.${pharmacy.id}@p.com`, role: StaffRole.STAFF, username: `c_${pharmacy.id.substring(0, 4)}`, password: passwordHash },
+                ]
+            });
 
-    console.log('💊 Inventory seeded with 2 products + batches (FIFO ready!)');
+            // 6. INVENTORY & BATCHES (Random 500-1500 items)
+            const inventorySize = 500 + Math.floor(Math.random() * 1000);
+            console.log(`   🛒 Stocking ${inventorySize} items for ${pharmacy.name}...`);
 
-    // 5. TẠO CUSTOMER MẪU
-    await prisma.customer.create({
-        data: {
-            phone: '0909999888',
-            fullName: 'Khách Hàng Demo',
-            email: 'customer@gmail.com',
-            verified: true,
-            verifiedAt: new Date(),
-        },
-    });
-    console.log('🛒 Customer created: 0909999888');
+            // Randomly select items
+            const shuffled = allCatalogItems.sort(() => 0.5 - Math.random());
+            const selectedItems = shuffled.slice(0, inventorySize);
 
-    console.log('');
-    console.log('═══════════════════════════════════════════');
-    console.log('✅ MASTER SEED COMPLETE!');
-    console.log('═══════════════════════════════════════════');
-    console.log('');
-    console.log('🔐 LOGIN CREDENTIALS:');
-    console.log('   System Admin: admin@pharmacy-saas.com / admin123');
-    console.log('   Owner:        owner@gmail.com / 123456');
-    console.log('   Manager:      manager@pharmacy.com / 123456');
-    console.log('   Pharmacist:   pharmacist@pharmacy.com / 123456');
-    console.log('');
-    console.log('📦 INVENTORY READY:');
-    console.log('   - Panadol Extra: 1500 units (2 batches for FIFO)');
-    console.log('   - Augmentin: 50 units (LOW STOCK ALERT!)');
-    console.log('═══════════════════════════════════════════');
+            for (const item of selectedItems) {
+                const inv = await prisma.pharmacyInventory.create({
+                    data: {
+                        pharmacyId: pharmacy.id,
+                        globalCatalogId: item.id,
+                        name: item.name,
+                        categoryId: categoryIds[0], // Simplified
+                        minStockLevel: 10,
+                        totalStockLevel: 300, // 3 batches * 100
+                        isActive: true
+                    }
+                });
+
+                // Units (Box/Pill)
+                await prisma.inventoryUnit.createMany({
+                    data: [
+                        { inventoryId: inv.id, name: 'Box', conversionFactor: 1, price: Number(item.unitPrice) * 1.2, isBaseUnit: true, isDefaultSelling: true },
+                        { inventoryId: inv.id, name: 'Carton', conversionFactor: 10, price: Number(item.unitPrice) * 12, isBaseUnit: false }
+                    ]
+                });
+
+                // Batches (Expired, Near, Future)
+                const now = new Date();
+                const expiredDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // -30 days
+                const nearDate = new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000); // +10 days
+                const futureDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000); // +1 year
+
+                await prisma.inventoryBatch.createMany({
+                    data: [
+                        { inventoryId: inv.id, batchCode: 'EXP-001', stockQuantity: 50, expiryDate: expiredDate, purchasePrice: Number(item.unitPrice) },
+                        { inventoryId: inv.id, batchCode: 'NEAR-002', stockQuantity: 100, expiryDate: nearDate, purchasePrice: Number(item.unitPrice) },
+                        { inventoryId: inv.id, batchCode: 'NEW-003', stockQuantity: 150, expiryDate: futureDate, purchasePrice: Number(item.unitPrice) }
+                    ]
+                });
+            }
+        }
+    }
+
+    console.log('🏁 SEEDING COMPLETE! DATABASE IS READY FOR BENCHMARK.');
 }
 
 main()
     .catch((e) => {
-        console.error('❌ Seed failed:', e);
+        console.error(e);
         process.exit(1);
     })
     .finally(async () => {

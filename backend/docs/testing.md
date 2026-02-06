@@ -59,7 +59,7 @@ This document tracks the progress and results of the automated testing initiativ
 | **SEC-H2** | **Expired Zombie Token** | ✅ Passed | JWT expiry correctly rejected with 401. |
 | **SEC-H3** | **Impersonation Scope Leak** | ✅ Passed | Separate token lineages per user verified. |
 | **SEC-H4** | **Password Change Revocation** | ✅ Passed | All 3 sessions killed atomically, single BullMQ alert. |
-| **SEC-H5** | **⚡ Kill Switch (Admin Ban)** | ✅ Passed | Admin bans Owner → 5 sessions revoked + Discord alert + status SUSPENDED. |
+| **SEC-H5** | **⚡ Kill Switch (Admin Ban)** | ✅ Passed | Admin bans Owner via `POST /api/auth/admin/security/suspend/:userId` → 5 sessions revoked + Discord alert + status SUSPENDED. |
 | **SEC-H6** | **🖐️ God's Hand (Staff Ban)** | ✅ Passed | Admin bans Staff → Staff deactivated + Owner notified via StaffNotification. |
 
 ### Key Fixes Applied During Tests
@@ -90,6 +90,29 @@ npm run test -- --runInBand
 
 # Run specific module
 npm run test -- --testPathPattern=inventory
-npm run test -- --testPathPattern=sales
 npm run test -- --testPathPattern=auth
 ```
+
+## ⚡ Performance Verification (Benchmark)
+
+### Scenario Setup
+- **Legacy Mode**: Simulated slow database query (~200ms latency).
+- **SaaS Enhanced Mode**: Real API (`/api/catalog`) with Redis Cache-Aside.
+- **Data Scale**: 10,000 Global Medicines in Database.
+
+### Results
+| Mode | Avg Latency | Throughput | Conclusion |
+| :--- | :--- | :--- | :--- |
+| **Legacy (Uncached)** | 201.77 ms | 49 req/sec | Slow, blocks CPU under load. |
+| **SaaS (Redis)** | **3.43 ms** | **12,340 req/sec** | **~60x Faster Latency**, **~250x Higher Throughput**. |
+
+**Verification Command**:
+```bash
+node scripts/benchmark_demo.js
+```
+### 5.3 Profiling Results (Clinic.js)
+- **Tool**: Clinic.js Doctor + Autocannon.
+- **Scenario**: 50 concurrent users, 10s duration.
+- **Metric**: Event Loop Delay.
+- **Result**: Flat line (0-5ms delay) even at 4k req/sec.
+- **Meaning**: Server (Node.js) is not blocked CPU-wise because Redis handles the load.

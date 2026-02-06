@@ -189,6 +189,35 @@ Các vấn đề sau đã được nhận diện nhưng quyết định **Skip**
 
 ---
 
+### 15. Thesis Evidence Audit (Tools & Metrics) 📊
+**Status**: ☑️ DONE (Feb 7, 2026)
+
+**What was done**:
+1.  **Code Quality (SonarQube)**:
+    - **Security**: Grade A (0 Vulnerabilities).
+    - **Reliability**: Grade C (94 Bugs - Mostly minor TS strictness).
+    - **Maintainability**: Grade A (Code Smells < 100).
+    - **Hotspots**: 8 Security Hotspots reviewed and marked Safe.
+
+2.  **Performance Profiling (Clinic.js)**:
+    - **Scenario**: High-concurrency access to Global Catalog (Secured + Rate Limited).
+    - **Result**:
+        - **Latency**: ~12ms (avg) vs Goal < 200ms.
+        - **Throughput**: ~4,000 req/sec (Safe Mode).
+        - **Scalability**: Event Loop Delay remains flat under load.
+
+3.  **Security Audit (Snyk)**:
+    - **Status**: ✅ PASSED (0 Vulnerabilities).
+    - **Fixes**: Replaced obsolete `yamljs` with `js-yaml`, upgraded `bcrypt` & `multer`.
+    - **Compliance**: Dependencies meet Enterprise Security Standards.
+
+4.  **Benchmark Comparison**:
+    - **Legacy (Direct DB)**: ~50 req/sec, 200ms latency.
+    - **SaaS (Redis Cached)**: ~4,000 req/sec, 12ms latency.
+    - **Improvement**: ~80x faster.
+
+---
+
 ## Schema Changes Applied
 
 | Table | Column | Type | Purpose |

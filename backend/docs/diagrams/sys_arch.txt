@@ -1,0 +1,551 @@
+==================================================
+SYSTEM ARCHITECTURE DOCUMENTATION
+Pharmacy Management System (Codename: PharmaEco)
+==================================================
+
+==================================================
+PART 1: ARCHITECTURE DESCRIPTION / MÔ TẢ KIẾN TRÚC
+==================================================
+
+## 1.1 System Architecture: Three-Tier Client-Server Architecture
+
+The Pharmacy Management System (PharmaEco) adopts a **Three-Tier Client-Server Architecture**, a widely-recognized pattern for enterprise-grade distributed systems. This architecture separates concerns into three distinct layers, each with specific responsibilities:
+
+### Presentation Tier (Client Layer)
+- **Web Application**: Next.js-based responsive dashboard for Owners, Staff, and System Admins.
+- **Mobile Application**: React Native (Expo) app for Customers to manage health records, place orders, and receive medicine reminders.
+- **Responsibilities**: User interface rendering, input validation, session management, and communication with the Application Tier via RESTful APIs.
+
+### Application Tier (Business Logic Layer)
+- **Backend Server**: Node.js + Express.js RESTful API server.
+- **Core Functions**: Authentication/Authorization (JWT + OTP), Business Rule Enforcement, Multi-tenant Isolation, FIFO/FEFO Inventory Logic, Analytics Computation.
+- **Background Workers**: BullMQ-powered job queues for asynchronous tasks (Notifications, Token Cleanup, Inventory Reconciliation).
+- **Responsibilities**: Processing client requests, executing business logic, enforcing security policies, and interacting with the Data Tier.
+
+### Data Tier (Database Layer)
+- **Primary Database**: PostgreSQL with Prisma ORM for type-safe data access.
+- **Cache Layer**: Redis for session caching, API response caching (Analytics Dashboard), and job queue management.
+- **Responsibilities**: Persistent data storage, transaction management, data integrity enforcement, backup and recovery.
+
+### Key Architectural Decisions:
+1. **Stateless API Design**: Backend is fully stateless, enabling horizontal scaling via Docker containers.
+2. **Multi-Tenancy**: Row Level Security (RLS) enforced at application level via Prisma Client Extensions.
+3. **Event-Driven Processing**: Critical events (Security Alerts, Notifications) are processed asynchronously via Redis/BullMQ.
+
+---
+
+## 1.2 Software Architecture: Modular Monolith with Ports & Adapters (Hexagonal)
+
+The backend codebase follows a **Modular Monolith** architecture combined with **Clean Architecture / Ports & Adapters (Hexagonal Architecture)** principles, providing a balance between simplicity and maintainability.
+
+### 1.2.1 Modular Monolith Pattern
+
+The system is organized into **10 independent business modules**, each encapsulating a specific domain:
+
+| Module | Domain Responsibility |
+|--------|----------------------|
+| `access-control` | Authentication, Authorization, Staff/Owner Management |
+| `analytics` | Dashboard Stats, P&L Reports, Revenue Charts |
+| `catalog` | Global Medicine Catalog, CSV Import, Approval Workflow |
+| `customers` | CRM, Health Records, Allergies, Customer Portal |
+| `inventory` | Stock Management, Batch Tracking (FIFO/FEFO), Alerts |
+| `sales` | Order Processing, POS, Invoice Generation |
+| `purchases` | Purchase Invoice Management, Supplier Integration |
+| `reminders` | Medicine Reminder Scheduling, Adherence Tracking |
+| `notifications` | Staff Alerts, Push Notifications, Queue Processing |
+| `system-admin` | God Mode Controls, Owner Approval, Kill Switch |
+
+**Benefits of Modular Monolith**:
+- **Simplified Deployment**: Single deployable unit vs microservices complexity.
+- **Clear Boundaries**: Each module has defined interfaces, enabling future extraction to microservices.
+- **Shared Infrastructure**: Common middleware, database connection, and utilities are reused efficiently.
+- **Type Safety**: TypeScript ensures contracts between modules are enforced at compile time.
+
+### 1.2.2 Ports & Adapters (Hexagonal) Architecture
+
+Each module follows the Ports & Adapters pattern with **4 distinct layers**:
+
+```
+src/modules/{module-name}/
+├── domain/           # Core Business Entities (No external dependencies)
+│   └── {entity}.entity.ts
+├── ports/            # Interfaces/Contracts (Inward-facing ports)
+│   └── {module}.repository.port.ts
+├── application/      # Use Cases & Business Logic (Services)
+│   ├── dtos.ts       # Data Transfer Objects (Input validation)
+│   └── {module}.service.ts
+└── adapters/         # External World Integration (Implementations)
+    ├── http/         # HTTP Controllers & Routes (Primary Adapter)
+    │   ├── controller.ts
+    │   └── routes.ts
+    └── database/     # Prisma Repository Implementation (Secondary Adapter)
+        └── prisma-{module}.repository.ts
+```
+
+### Layer Responsibilities:
+
+**1. Domain Layer** (`/domain`)
+- Contains pure business entities and value objects.
+- Zero dependencies on frameworks or external libraries.
+- Example: `InventoryEntity`, `InventoryBatchEntity`
+
+**2. Ports Layer** (`/ports`)
+- Defines interfaces (contracts) that the application layer depends on.
+- Abstracts external concerns (database, external APIs) from business logic.
+- Example: `IInventoryRepository` interface defining CRUD + batch operations.
+
+**3. Application Layer** (`/application`)
+- Contains Use Cases (Services) implementing business rules.
+- Depends ONLY on Ports (interfaces), not concrete implementations.
+- Handles DTOs for input validation and data transformation.
+- Example: `InventoryService.deductStock()` implementing FIFO logic.
+
+**4. Adapters Layer** (`/adapters`)
+- **Primary Adapters (Driving)**: HTTP Controllers that receive external requests.
+- **Secondary Adapters (Driven)**: Prisma Repository implementing `IInventoryRepository` port.
+- Technology-specific code is isolated here, keeping core logic portable.
+
+### Dependency Rule (Clean Architecture):
+```
+┌─────────────────────────────────────────────────────┐
+│                  HTTP Controllers                    │
+│                 (Primary Adapters)                   │
+└────────────────────────┬────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────┐
+│               Application Services                   │
+│            (Use Cases / Business Logic)              │
+└────────────────────────┬────────────────────────────┘
+                         ▼
+┌─────────────────────────────────────────────────────┐
+│                     Ports                            │
+│           (Interfaces / Contracts)                   │
+└────────────────────────┬────────────────────────────┘
+                         ▲
+┌─────────────────────────────────────────────────────┐
+│              Prisma Repositories                     │
+│              (Secondary Adapters)                    │
+└─────────────────────────────────────────────────────┘
+```
+
+Dependencies flow **inward** toward the domain. Adapters depend on Ports, not vice versa.
+
+---
+
+## 1.3 Shared Infrastructure (`/src/shared`)
+
+Cross-cutting concerns are organized in the `shared` directory:
+
+| Directory | Purpose |
+|-----------|---------|
+| `/config` | Environment variables, database connection |
+| `/middleware` | Authentication, RBAC, Tenant Isolation, Error Handling |
+| `/prisma` | RLS Extensions, Tenant-aware Prisma Client |
+| `/queue` | BullMQ connection and queue definitions |
+| `/services` | Shared services (Email, OTP) |
+| `/services/audit` | **Audit Logger** - Critical security component for tracking all sensitive operations (Login, Admin Actions, Data Exports, Kill Switch). Essential for forensic analysis and threat tracing. |
+| `/utils` | Logger, CSV Sanitizer, Helpers |
+
+---
+
+## 1.4 Background Workers (`/src/workers`)
+
+Asynchronous tasks are handled by dedicated workers:
+
+| Worker | Schedule | Purpose |
+|--------|----------|---------|
+| `scheduler.worker` | Every 1 min | Generate medicine reminder notifications |
+| `missed-check.worker` | Every 5 min | Mark unacknowledged notifications as "Missed" |
+| `system-alerts.worker` | Daily | Generate low-stock and expiry alerts |
+| `inventory-reconciliation.worker` | Hourly | Self-healing stock discrepancies |
+| `token-cleanup.worker` | Daily (BullMQ) | Remove expired/revoked refresh tokens |
+| `security.worker` | On-demand (BullMQ) | **Active Defense**: Handles real-time administrative alerts via Discord Webhooks. Triggered by Kill Switch, Token Reuse Detection, and Password Changes. |
+| `notification.worker` | On-demand (BullMQ) | Deliver push notifications to mobile devices |
+
+==================================================
+PART 2: PLANTUML DIAGRAMS
+==================================================
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+
+title Three-Tier Client-Server Architecture\nPharmacy Management System (PharmaEco)
+
+' === PRESENTATION TIER ===
+package "Presentation Tier" #E3F2FD {
+    component "**Web Application**\n(Next.js)" as WebApp #90CAF9
+    component "**Mobile App**\n(React Native/Expo)" as MobileApp #90CAF9
+    component "**Admin Dashboard**\n(Bull Board UI)" as AdminUI #90CAF9
+}
+
+' === APPLICATION TIER ===
+package "Application Tier" #FFF3E0 {
+    component "**Express.js API Server**" as API #FFB74D {
+        component "Auth Module" as AuthMod
+        component "Inventory Module" as InvMod
+        component "Sales Module" as SalesMod
+        component "Analytics Module" as AnalyticsMod
+        component "Catalog Module" as CatalogMod
+        component "Customers Module" as CustMod
+        component "Notifications Module" as NotifMod
+        component "Reminders Module" as ReminderMod
+    }
+    
+    component "**Background Workers**\n(BullMQ)" as Workers #FFCC80 {
+        component "Scheduler Worker" as SchedWorker
+        component "Security Worker" as SecWorker
+        component "Notification Worker" as NotifWorker
+        component "Token Cleanup Worker" as TokenWorker
+    }
+    
+    component "**Shared Services**" as Shared #FFE0B2 {
+        component "JWT Auth" as JWT
+        component "RLS Middleware" as RLS
+        component "Audit Logger" as Audit
+        component "Email Service" as Email
+    }
+}
+
+' === DATA TIER ===
+package "Data Tier" #E8F5E9 {
+    database "**PostgreSQL**\n(Primary DB)" as Postgres #81C784
+    database "**Redis**\n(Cache + Queue)" as Redis #A5D6A7
+    storage "**Cloudinary**\n(Media Storage)" as Cloudinary #C8E6C9
+}
+
+' === EXTERNAL SERVICES ===
+cloud "External Services" #F3E5F5 {
+    component "Expo Push\nNotifications" as ExpoPush #CE93D8
+    component "Discord\nWebhook" as Discord #CE93D8
+    component "SMTP\n(Nodemailer)" as SMTP #CE93D8
+}
+
+' === CONNECTIONS ===
+WebApp --> API : "HTTPS/REST\nJWT Bearer"
+MobileApp --> API : "HTTPS/REST\nJWT Bearer"
+AdminUI --> API : "HTTP (Internal)"
+
+API --> Postgres : "Prisma ORM\n(SQL Queries)"
+API --> Redis : "Cache Reads\n(TTL: 30s)"
+Workers --> Redis : "Job Queue\n(BullMQ)"
+Workers --> Postgres : "DB Operations"
+
+API --> Cloudinary : "Image Upload"
+Workers --> ExpoPush : "Push Notifications"
+Workers --> Discord : "Security Alerts"
+API --> SMTP : "Email Bridge"
+
+' === LEGEND ===
+legend right
+  |<#E3F2FD> Presentation Tier |
+  |<#FFF3E0> Application Tier |
+  |<#E8F5E9> Data Tier |
+  |<#F3E5F5> External Services |
+endlegend
+
+@enduml
+
+---
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam packageStyle frame
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 10
+
+title Modular Monolith - Module Structure\nPorts & Adapters (Hexagonal) Architecture
+
+package "Backend Server (Node.js + Express)" {
+
+    package "Shared Infrastructure" #ECEFF1 {
+        component [Config] as Config
+        component [Middleware] as Middleware
+        component [Prisma RLS] as PrismaRLS
+        component [BullMQ Queue] as Queue
+        component [Utils] as Utils
+    }
+
+    package "Business Modules" #FFF8E1 {
+        
+        package "Inventory Module" #FFFDE7 {
+            package "Domain" #FFF9C4 {
+                component [InventoryEntity] as InvEntity
+                component [BatchEntity] as BatchEntity
+            }
+            package "Ports" #FFECB3 {
+                interface IInventoryRepository as IInvRepo
+            }
+            package "Application" #FFE082 {
+                component [InventoryService] as InvService
+                component [DTOs] as InvDTOs
+            }
+            package "Adapters" #FFD54F {
+                component [HTTP Controller] as InvController
+                component [Prisma Repository] as InvPrismaRepo
+            }
+            
+            InvController --> InvService : "uses"
+            InvService --> IInvRepo : "depends on"
+            InvPrismaRepo ..|> IInvRepo : "implements"
+            InvService --> InvEntity : "operates on"
+        }
+        
+        package "Sales Module" #E3F2FD {
+            package "Adapters" #BBDEFB {
+                component [SalesController] as SalesController
+                component [SalesRepository] as SalesRepo
+            }
+            package "Application" #90CAF9 {
+                component [SalesService] as SalesService
+            }
+            package "Ports" #64B5F6 {
+                interface ISalesRepository as ISalesRepo
+            }
+            
+            SalesController --> SalesService
+            SalesService --> ISalesRepo
+            SalesRepo ..|> ISalesRepo
+        }
+        
+        package "Access Control Module" #F3E5F5 {
+            component [AuthService] as AuthService
+            component [OwnerService] as OwnerService
+            component [StaffService] as StaffService
+        }
+        
+        package "Other Modules..." #FAFAFA {
+            component [Analytics]
+            component [Catalog]
+            component [Customers]
+            component [Notifications]
+            component [Reminders]
+            component [Purchases]
+        }
+    }
+    
+    ' Cross-module dependencies
+    SalesService --> IInvRepo : "deductStock()"
+    InvService --> PrismaRLS : "tenant isolation"
+    AuthService --> Middleware : "JWT validation"
+}
+
+note right of IInvRepo
+  **Port (Interface)**
+  Defines contract for
+  data access without
+  specifying implementation
+end note
+
+note right of InvPrismaRepo
+  **Adapter (Implementation)**
+  Concrete Prisma-based
+  implementation of the port
+end note
+
+@enduml
+
+---
+
+@startuml
+!theme plain
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+title Clean Architecture - Dependency Flow\n(Onion Model)
+
+package "External World" #ECEFF1 {
+    [HTTP Request] as HTTP
+    [Database/Redis] as DB
+    [Push Services] as Push
+}
+
+package "Adapters Layer" #FFF3E0 {
+    [Controllers\n(Routes, Handlers)] as Controllers
+    [Repositories\n(Prisma, Redis)] as Repositories
+    [External Clients\n(Email, Push)] as ExternalClients
+}
+
+package "Application Layer" #E3F2FD {
+    [Services\n(Use Cases)] as Services
+    [DTOs\n(Validation)] as DTOs
+}
+
+package "Ports Layer" #FFF9C4 {
+    interface "IRepository" as IRepo
+    interface "IExternalService" as IExternal
+}
+
+package "Domain Layer" #C8E6C9 {
+    [Entities\n(Business Objects)] as Entities
+    [Value Objects] as ValueObjects
+}
+
+' Inward dependencies
+HTTP --> Controllers
+Controllers --> DTOs
+Controllers --> Services
+Services --> IRepo : "depends on interface"
+Services --> IExternal : "depends on interface"
+Services --> Entities : "operates on"
+Repositories ..|> IRepo : "implements"
+ExternalClients ..|> IExternal : "implements"
+Repositories --> DB
+ExternalClients --> Push
+
+note bottom of Entities
+  **Domain is the core**
+  No dependencies on
+  external frameworks
+end note
+
+@enduml
+
+==================================================
+PART 3: LATEX DOCUMENTATION
+==================================================
+
+\subsection{System Design}
+The system was built following an Agile software development approach, enabling iterative planning, continuous feedback, and flexibility in implementing new features. Development was divided into several sprints, each focusing on a specific module such as medicine management, sales and invoices, suppliers, and authentication. The PharmaEco system adopts a Three-Tier Client-Server Architecture.
+
+\subsubsection{System Architecture}
+The Three-Tier Client-Server Architecture separates systems into presentation, application, and data layers, enhancing scalability, maintainability, and performance. By isolating the concerns, this model enhances resource management and enables independent scaling and updates, making it a favored option for intricate distributed systems\cite{3-tier}. The Fig \ref{fig:sys_arch} demonstrates the Three-Tier Client-Server Architecture of PharmaEco system and shows how the system communicates to users.
+
+The Three-Tier Client-Server Architecture is a structured method for creating distributed systems, where each layer has specific responsibilities. Here is a thorough description of every element:
+\begin{itemize}
+   \item \textbf{Presentation Tier (Client Tier):} The Presentation Tier is the application's front end, encompassing the User Interface that users interact with. In PharmaEco, this includes:
+   \begin{itemize}
+       \item \textbf{Web Application} (Next.js): A responsive dashboard for Pharmacy Owners, Staff, and System Administrators to manage inventory, process sales, and view analytics.
+       \item \textbf{Mobile Application} (React Native/Expo): A customer-facing app for ordering medications, managing health records, and receiving medicine reminders.
+   \end{itemize}
+   It's responsible for displaying data, collecting user inputs, handling initial input processing like validation, and communicating these interactions to the Application Tier via RESTful APIs secured with JWT Bearer tokens\cite{3-tier}.
+   
+   \item \textbf{Application Tier (Business Logic Tier):} The Application Tier houses the core business logic, processing user requests from the Presentation Tier, performing calculations, and enforcing business rules. In PharmaEco, this layer is implemented using:
+   \begin{itemize}
+       \item \textbf{Express.js API Server}: A stateless RESTful API handling all business operations.
+       \item \textbf{Modular Architecture}: 10 independent business modules (Authentication, Inventory, Sales, Analytics, Catalog, Customers, Notifications, Reminders, Purchases, System Admin).
+       \item \textbf{Background Workers (BullMQ)}: Asynchronous job processing for notifications, token cleanup, and inventory reconciliation.
+       \item \textbf{Shared Services}: Cross-cutting concerns including JWT authentication, Row Level Security (RLS) middleware, and audit logging.
+   \end{itemize}
+   This tier manages communication, executes business logic, and interacts with the Data Tier for information retrieval or storage before sending results back to the user\cite{3-tier}.
+   
+   \item \textbf{Data Tier (Database Tier):} The Data Tier is responsible for all aspects of data management and storage, utilizing:
+   \begin{itemize}
+       \item \textbf{PostgreSQL}: The primary relational database managed via Prisma ORM, storing all business entities (Pharmacies, Inventory, Orders, Customers, etc.).
+       \item \textbf{Redis}: An in-memory cache for API response caching (Analytics Dashboard with 30-second TTL) and job queue management (BullMQ).
+       \item \textbf{Cloudinary}: Cloud-based media storage for product images and documents.
+   \end{itemize}
+   Its key responsibilities include securely storing data, handling queries and transactions from the Application Tier, ensuring data integrity and availability, and providing backup and recovery mechanisms\cite{3-tier}.
+\end{itemize}
+
+\subsubsection{Software Architecture}
+Beyond the system-level three-tier design, the PharmaEco backend employs a \textbf{Modular Monolith} architecture combined with \textbf{Clean Architecture / Ports \& Adapters (Hexagonal Architecture)} principles at the software level.
+
+\paragraph{Modular Monolith Pattern}
+The backend is organized into 10 independent business modules, each encapsulating a specific domain:
+\begin{itemize}
+    \item \texttt{access-control}: Authentication, Authorization, Staff/Owner Management
+    \item \texttt{analytics}: Dashboard Statistics, P\&L Reports, Revenue Charts
+    \item \texttt{catalog}: Global Medicine Catalog, CSV Import, Approval Workflow
+    \item \texttt{customers}: CRM, Health Records, Allergies, Customer Portal
+    \item \texttt{inventory}: Stock Management, Batch Tracking (FIFO/FEFO), Alerts
+    \item \texttt{sales}: Order Processing, POS, Invoice Generation
+    \item \texttt{purchases}: Purchase Invoice Management, Supplier Integration
+    \item \texttt{reminders}: Medicine Reminder Scheduling, Adherence Tracking
+    \item \texttt{notifications}: Staff Alerts, Push Notifications, Queue Processing
+    \item \texttt{system-admin}: God Mode Controls, Owner Approval, Kill Switch
+\end{itemize}
+
+This approach provides the simplicity of a single deployable unit while maintaining clear module boundaries that enable future extraction to microservices if needed\cite{modular-monolith}.
+
+\paragraph{Ports \& Adapters (Hexagonal) Architecture}
+Each module follows the Ports \& Adapters pattern with four distinct layers:
+
+\begin{enumerate}
+    \item \textbf{Domain Layer} (\texttt{/domain}): Contains pure business entities and value objects with zero dependencies on external frameworks. Example: \texttt{InventoryEntity}, \texttt{InventoryBatchEntity}.
+    
+    \item \textbf{Ports Layer} (\texttt{/ports}): Defines interfaces (contracts) that the application layer depends on, abstracting external concerns from business logic. Example: \texttt{IInventoryRepository} interface defining CRUD and batch operations.
+    
+    \item \textbf{Application Layer} (\texttt{/application}): Contains Use Cases (Services) implementing business rules. Depends ONLY on Ports (interfaces), not concrete implementations. Example: \texttt{InventoryService.deductStock()} implementing FIFO logic.
+    
+    \item \textbf{Adapters Layer} (\texttt{/adapters}): 
+    \begin{itemize}
+        \item \textbf{Primary Adapters (Driving)}: HTTP Controllers that receive external requests.
+        \item \textbf{Secondary Adapters (Driven)}: Prisma Repository implementations of the port interfaces.
+    \end{itemize}
+\end{enumerate}
+
+The key principle is the \textbf{Dependency Rule}: dependencies always point inward toward the domain. Adapters depend on Ports, never vice versa. This ensures that the core business logic remains independent of external frameworks, databases, and delivery mechanisms\cite{clean-arch}.
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|l|p{8cm}|}
+\hline
+\textbf{Layer} & \textbf{Directory} & \textbf{Responsibility} \\ \hline
+Domain & \texttt{/domain} & Business entities, value objects, domain rules \\ \hline
+Ports & \texttt{/ports} & Interface definitions (Repository contracts) \\ \hline
+Application & \texttt{/application} & Services (Use Cases), DTOs, Business Logic \\ \hline
+Adapters & \texttt{/adapters/http} & HTTP Controllers, Routes (Primary) \\ \hline
+Adapters & \texttt{/adapters/database} & Prisma Repository implementations (Secondary) \\ \hline
+\end{tabular}
+\caption{Ports \& Adapters Layer Structure}
+\label{tab:hexagonal_layers}
+\end{table}
+
+\paragraph{Shared Infrastructure}
+Cross-cutting concerns are organized in the \texttt{/src/shared} directory:
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|p{9cm}|}
+\hline
+\textbf{Directory} & \textbf{Purpose} \\ \hline
+\texttt{/config} & Environment variables, database connection configuration \\ \hline
+\texttt{/middleware} & Authentication, RBAC, Tenant Isolation, Error Handling \\ \hline
+\texttt{/prisma} & RLS Extensions, Tenant-aware Prisma Client \\ \hline
+\texttt{/queue} & BullMQ connection and queue definitions \\ \hline
+\texttt{/services} & Shared services (Email, OTP) \\ \hline
+\texttt{/services/audit} & \textbf{Audit Logger} - Critical security component for tracking sensitive operations (Login, Admin Actions, Data Exports, Kill Switch). Essential for forensic analysis and threat tracing. \\ \hline
+\texttt{/utils} & Logger, CSV Sanitizer, Helper Functions \\ \hline
+\end{tabular}
+\caption{Shared Infrastructure Components}
+\label{tab:shared_infra}
+\end{table}
+
+\paragraph{Background Workers}
+To maintain API responsiveness and handle time-consuming tasks, PharmaEco employs background workers powered by BullMQ (Redis-based job queue):
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{|l|l|p{6cm}|}
+\hline
+\textbf{Worker} & \textbf{Schedule} & \textbf{Purpose} \\ \hline
+\texttt{scheduler.worker} & Every 1 min & Generate medicine reminder notifications \\ \hline
+\texttt{missed-check.worker} & Every 5 min & Mark unacknowledged notifications as "Missed" \\ \hline
+\texttt{system-alerts.worker} & Daily & Generate low-stock and expiry alerts \\ \hline
+\texttt{inventory-reconciliation.worker} & Hourly & Self-heal stock discrepancies \\ \hline
+\texttt{token-cleanup.worker} & Daily (BullMQ) & Remove expired/revoked refresh tokens \\ \hline
+\texttt{security.worker} & On-demand & \textbf{Active Defense}: Handles real-time administrative alerts via Discord Webhooks. Triggered by Kill Switch, Token Reuse Detection, and Password Changes. \\ \hline
+\texttt{notification.worker} & On-demand & Deliver push notifications via Expo \\ \hline
+\end{tabular}
+\caption{Background Worker Configuration}
+\label{tab:workers}
+\end{table}
+
+\subsubsection{Benefits of the Chosen Architecture}
+
+\begin{itemize}
+    \item \textbf{Maintainability}: Clear separation of concerns makes the codebase easier to understand and modify.
+    \item \textbf{Testability}: Business logic can be unit-tested independently from external dependencies by mocking ports.
+    \item \textbf{Flexibility}: Database or external service changes only require updating adapters, not core business logic.
+    \item \textbf{Scalability}: Stateless API design enables horizontal scaling; individual modules can be extracted to microservices when needed.
+    \item \textbf{Security}: Multi-tenancy isolation via Prisma RLS middleware prevents cross-pharmacy data leaks.
+\end{itemize}
+
+==================================================
+END OF DOCUMENT
+==================================================

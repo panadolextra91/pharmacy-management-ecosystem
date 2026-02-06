@@ -1,5 +1,6 @@
 import swaggerUi from 'swagger-ui-express';
-import YAML from 'yamljs';
+import yaml from 'js-yaml';
+import fs from 'fs';
 import path from 'path';
 import { Express } from 'express';
 
@@ -12,7 +13,7 @@ import { Express } from 'express';
 export function setupSwagger(app: Express): void {
     try {
         // Load OpenAPI spec from YAML file
-        const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
+        const swaggerDocument = yaml.load(fs.readFileSync(path.join(__dirname, 'swagger.yaml'), 'utf8'));
 
         // Swagger UI options
         const options: swaggerUi.SwaggerUiOptions = {
@@ -33,7 +34,7 @@ export function setupSwagger(app: Express): void {
         };
 
         // Mount Swagger UI at /api/docs
-        app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, options));
+        app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument as any, options));
 
         console.log('📚 Swagger UI mounted at /api/docs');
     } catch (error) {

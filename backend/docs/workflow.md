@@ -116,6 +116,26 @@ This document outlines the core workflows of the Pharmacy Management System, det
 
 ---
 
+## 3.8 Redis Cache-Aside Workflow ⚡
+**Actors**: System, Global Catalog Service
+
+### Read Strategy (Lazy Loading)
+1.  **Actor** requests data (e.g., `GET /api/catalog`).
+2.  **System** checks Redis Cache (`GET catalog:list:page:1`).
+    *   **Cache Hit**: Return data immediately (<5ms).
+    *   **Cache Miss**:
+        1.  System queries Database (SQL).
+        2.  System saves result to Redis (TTL 1 hour).
+        3.  System returns data.
+
+### Invalidation Strategy (Data Consistency)
+1.  **Admin/Rep** updates/creates Catalog Item.
+2.  **System** updates Database.
+3.  **System** deletes related cache keys (`DEL catalog:list:*`).
+4.  **Next Read** will force a Cache Miss and refresh data.
+
+---
+
 ## 4.- **Sales & Point of Sale (POS)**: Core transaction flow, Receipt generation.
 - **Analytics & Reporting**: Dashboard stats, Charts, Advanced Reports (P&L, Top Selling).
 - **Customer Management (CRM)**: Identify customers, Track health info, View purchase history.
@@ -283,7 +303,7 @@ const customer = await TestFactory.createCustomer();
 
 ### Admin Bans User Flow
 1.  **Admin** identifies suspicious user via dashboard or alert.
-2.  **Admin** calls `POST /admin/security/suspend/:userId` with `{ userType: 'OWNER' | 'STAFF' | 'CUSTOMER' }`.
+2.  **Admin** calls `POST /api/auth/admin/security/suspend/:userId` with `{ userType: 'OWNER' | 'STAFF' | 'CUSTOMER' }`.
 3.  **System** executes Kill Switch:
     - Updates user status to `SUSPENDED` (Owner) or `isActive: false` (Staff).
     - Revokes ALL refresh tokens for that user (atomic DB operation).
@@ -299,3 +319,18 @@ const customer = await TestFactory.createCustomer();
 | ⚔️ ADMIN_BAN | 🟣 Purple | "Công lý của Nữ hoàng" |
 | 🔒 PASSWORD_CHANGED | 🟠 Orange | "Có khứa đổi pass" |
 
+---
+
+## 10. Performance Profiling Workflow (Evidence Generation) 📈
+**Actors**: Developer (Pre-Thesis Defense)
+
+### Validating Throughput
+1.  **Developer** starts the server with Redis enabled.
+2.  **System** pre-loads (warms up) cache if needed (Lazy Loading preferred).
+3.  **Developer** runs `npm run profile:api`.
+4.  **Clinic.js** wraps the Node.js process and attaches probes.
+5.  **Autocannon** fires 50 concurrent requests for 10 seconds.
+6.  **Clinic.js** generates HTML Report:
+    - **Green Line**: Event Loop Delay (Should be flat).
+    - **Red Line**: CPU Usage (Should match load).
+7.  **Developer** verifies "Event Loop Delay" < 10ms.
