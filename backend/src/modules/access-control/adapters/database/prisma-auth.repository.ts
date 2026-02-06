@@ -216,4 +216,27 @@ export class PrismaAuthRepository implements IAuthRepository {
             }
         });
     }
+
+    // Password Management (SEC-H4)
+    async findOwnerById(id: string): Promise<any | null> {
+        return prisma.owner.findUnique({ where: { id } });
+    }
+
+    async findCustomerById(id: string): Promise<any | null> {
+        return prisma.customer.findUnique({ where: { id } });
+    }
+
+    async findStaffByIdForPassword(id: string): Promise<any | null> {
+        return prisma.pharmacyStaff.findUnique({ where: { id } });
+    }
+
+    async updatePassword(userId: string, role: string, hashedPassword: string): Promise<void> {
+        if (role === 'OWNER') {
+            await prisma.owner.update({ where: { id: userId }, data: { password: hashedPassword } });
+        } else if (role === 'CUSTOMER') {
+            await prisma.customer.update({ where: { id: userId }, data: { password: hashedPassword } });
+        } else if (['STAFF', 'PHARMACIST', 'MANAGER'].includes(role)) {
+            await prisma.pharmacyStaff.update({ where: { id: userId }, data: { password: hashedPassword } });
+        }
+    }
 }

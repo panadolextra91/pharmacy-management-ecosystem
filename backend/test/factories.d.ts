@@ -1,0 +1,141 @@
+import { PrismaClient } from '@prisma/client';
+export declare const TestFactory: {
+    prisma: PrismaClient<import(".prisma/client").Prisma.PrismaClientOptions, never, import("@prisma/client/runtime/library").DefaultArgs>;
+    init(): Promise<void>;
+    resetDb(): Promise<void>;
+    createSupplier(): Promise<{
+        name: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        address: string;
+        contactInfo: import("@prisma/client/runtime/library").JsonValue;
+    }>;
+    createPharmaRep(supplierId: string): Promise<{
+        name: string;
+        id: string;
+        email: string;
+        phone: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        supplierId: string;
+        lastOtp: string | null;
+        otpExpiresAt: Date | null;
+        isVerified: boolean;
+    }>;
+    createPharmacyOwner(): Promise<{
+        status: import(".prisma/client").$Enums.OwnerStatus;
+        name: string;
+        id: string;
+        email: string;
+        password: string;
+        phone: string | null;
+        subscriptionExpiry: Date | null;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+    }>;
+    createPharmacy(ownerId: string): Promise<{
+        hours: import("@prisma/client/runtime/library").JsonValue;
+        name: string;
+        id: string;
+        email: string | null;
+        phone: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        ownerId: string;
+        address: string;
+        latitude: number;
+        longitude: number;
+        serviceRadius: number;
+    }>;
+    createPharmacyStaff(pharmacyId: string, role?: "STAFF" | "PHARMACIST" | "MANAGER"): Promise<{
+        name: string;
+        id: string;
+        email: string;
+        password: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        pharmacyId: string;
+        username: string;
+        role: import(".prisma/client").$Enums.StaffRole;
+        avatar: string | null;
+        avatarPublicId: string | null;
+    }>;
+    createGlobalMedicine(supplierId: string, repId: string): Promise<{
+        status: import(".prisma/client").$Enums.CatalogStatus;
+        name: string;
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        supplierId: string;
+        description: string | null;
+        categoryId: string | null;
+        brandId: string | null;
+        manufacturer: string | null;
+        packaging: string | null;
+        activeIngredient: string | null;
+        barcode: string | null;
+        pharmaRepId: string;
+        unitPrice: import("@prisma/client/runtime/library").Decimal | null;
+    }>;
+    createInventoryItem(pharmacyId: string, globalMedicineId: string): Promise<{
+        units: {
+            name: string;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            conversionFactor: number;
+            price: import("@prisma/client/runtime/library").Decimal;
+            isBaseUnit: boolean;
+            isDefaultSelling: boolean;
+            inventoryId: string;
+        }[];
+    } & {
+        name: string;
+        id: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        pharmacyId: string;
+        globalCatalogId: string | null;
+        description: string | null;
+        image: string | null;
+        imagePublicId: string | null;
+        categoryId: string | null;
+        brandId: string | null;
+        storageLocationId: string | null;
+        totalStockLevel: number;
+        isDeleted: boolean;
+        minStockLevel: number;
+    }>;
+    createBatch(inventoryId: string, quantity: number, daysExpiry: number, purchasePrice?: number): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        isDeleted: boolean;
+        inventoryId: string;
+        batchCode: string;
+        expiryDate: Date;
+        stockQuantity: number;
+        purchasePrice: import("@prisma/client/runtime/library").Decimal | null;
+        purchaseDate: Date | null;
+    }>;
+    createCustomer(): Promise<{
+        id: string;
+        email: string | null;
+        password: string | null;
+        phone: string;
+        createdAt: Date;
+        updatedAt: Date;
+        address: string | null;
+        fullName: string | null;
+        verified: boolean;
+        verifiedAt: Date | null;
+        registrationSource: string | null;
+    }>;
+};
+//# sourceMappingURL=factories.d.ts.map

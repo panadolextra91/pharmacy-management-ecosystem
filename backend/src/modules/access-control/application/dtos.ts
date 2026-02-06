@@ -82,6 +82,7 @@ export interface TokenPayload {
   email?: string;
   phone?: string;
   role: string;
+  userType?: 'OWNER' | 'STAFF' | 'CUSTOMER' | 'SYSTEM_ADMIN'; // For Kill Switch
   pharmacyId?: string;
 }
 

@@ -39,12 +39,20 @@ This document outlines the core workflows of the Pharmacy Management System, det
 4.  **System** returns tokens and user profile.
 5.  **Front-End** stores tokens securely (HTTP-only cookies or SecureStore).
 
-### Refresh Token Flow (Rotation)
+### Refresh Token Flow (Rotation) ✅ Tested SEC-01
 1.  **Actor** requests new Access Token (`POST /auth/refresh`).
 2.  **System** verifies Refresh Token.
     *   **If Valid**: Revokes old token, issues NEW Access + NEW Refresh Token.
-    *   **If Revoked (Reuse Attempt)**: **SECURITY BREACH!** System revokes ALL tokens for that user and forces logout (Error: `SECURITY_BREACH_LOGOUT`).
+    *   **If Revoked (Reuse Attempt)**: **SECURITY BREACH!** System revokes ALL tokens for that user, dispatches BullMQ `SECURITY_ALERT` job, and forces logout (Error: `SECURITY_BREACH_LOGOUT`). ✅ Tested SEC-H1
 3.  **Front-End** replaces old tokens with new ones.
+
+### Password Change Flow (SEC-H4) 🔐
+1.  **Actor** calls `POST /auth/change-password` with `{ oldPassword, newPassword }`.
+2.  **System** verifies old password using bcrypt.
+3.  **System** updates password hash in database.
+4.  **System** revokes ALL refresh tokens atomically (single DB command).
+5.  **System** dispatches `SECURITY_ALERT` job to BullMQ (password changed notification).
+6.  **Actor** must re-login on all devices.
 
 ### Tenant Isolation (Middleware)
 1.  **Actor** makes a request to a protected route (e.g., `/api/inventory`).
@@ -223,3 +231,71 @@ This document outlines the core workflows of the Pharmacy Management System, det
 2.  **System** looks for `SENT` or `PENDING` notifications > 15 minutes old.
 3.  **System** marks `ReminderNotification` as `FAILED` (Msg: Timeout).
 4.  **System** creates `ReminderLog` (Type: `missed`).
+
+---
+
+## 8. Quality Assurance & Testing Workflow 🧪
+
+**Actors**: Developer, CI/CD Pipeline
+
+### Test Execution Flow
+1.  **Developer** runs `npm run test -- --runInBand` locally.
+2.  **System** uses `pharmacy_test` database (isolated from dev/prod).
+3.  **Jest** executes test suites:
+    - Inventory Module: 7 tests (FIFO, Multi-Batch, Hell-Cases)
+    - Sales Module: 5 tests (Snapshot Pricing, Atomic Rollback, Security)
+    - **Auth/Security Module: 9 tests** (Token Rotation, Reuse Detection, Kill Switch, God's Hand)
+4.  **System** outputs results: `21 passed, 0 failed`.
+
+### Test Factory Usage
+```typescript
+// Create mock data for tests
+const supplier = await TestFactory.createSupplier();
+const rep = await TestFactory.createPharmaRep(supplier.id);
+const globalMed = await TestFactory.createGlobalMedicine(supplier.id, rep.id);
+const owner = await TestFactory.createPharmacyOwner(); // bcrypt-hashed password
+const pharmacy = await TestFactory.createPharmacy(owner.id);
+const staff = await TestFactory.createPharmacyStaff(pharmacy.id); // NEW
+const inventory = await TestFactory.createInventoryItem(pharmacy.id, globalMed.id);
+const batch = await TestFactory.createBatch(inventory.id, 100, 30);
+const customer = await TestFactory.createCustomer();
+```
+
+### Critical Test Cases Verified
+| Module | Test | Purpose |
+| :--- | :--- | :--- |
+| Inventory | INV-H1 | Expired batches ignored in FIFO |
+| Inventory | INV-H4 | Cross-tenant access blocked |
+| Sales | SALE-H1 | Cost price snapshot frozen |
+| Sales | SALE-H2 | Atomic rollback on failure |
+| Sales | SALE-H5 | Client price ignored, server-side pricing enforced |
+| **Security** | SEC-01 | Token rotation: old token revoked |
+| **Security** | SEC-H1 | Reuse detection + BullMQ alert |
+| **Security** | SEC-H4 | Password change revokes all sessions |
+| **Security** | **SEC-H5** | ⚡ Kill Switch: Admin bans user, 5 sessions revoked |
+| **Security** | **SEC-H6** | 🖐️ God's Hand: Staff ban → Owner notified |
+
+---
+
+## 9. Kill Switch Workflow (God Mode Security) ⚡
+
+**Actors**: System Admin, Owner, Staff
+
+### Admin Bans User Flow
+1.  **Admin** identifies suspicious user via dashboard or alert.
+2.  **Admin** calls `POST /admin/security/suspend/:userId` with `{ userType: 'OWNER' | 'STAFF' | 'CUSTOMER' }`.
+3.  **System** executes Kill Switch:
+    - Updates user status to `SUSPENDED` (Owner) or `isActive: false` (Staff).
+    - Revokes ALL refresh tokens for that user (atomic DB operation).
+    - Dispatches Discord alert to security channel (BullMQ + Redis throttle).
+    - If Staff: Creates `StaffNotification` for pharmacy + notifies Owner.
+4.  **User** is immediately logged out on all devices.
+5.  **Discord** receives alert with user details and admin email.
+
+### Discord Alert Types
+| Event | Color | Message |
+| :--- | :--- | :--- |
+| 🚨 TOKEN_REUSE | 🔴 Red | "Tru di tam tộc session" |
+| ⚔️ ADMIN_BAN | 🟣 Purple | "Công lý của Nữ hoàng" |
+| 🔒 PASSWORD_CHANGED | 🟠 Orange | "Có khứa đổi pass" |
+

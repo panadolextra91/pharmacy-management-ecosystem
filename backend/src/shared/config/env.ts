@@ -36,6 +36,9 @@ const envSchema = z.object({
   // Expo
   EXPO_ACCESS_TOKEN: z.string().optional(),
 
+  // Discord Webhook (Kill Switch Alerts)
+  DISCORD_WEBHOOK_URL: z.string().url().optional(),
+
   // CORS
   CORS_ORIGIN: z.string().default('http://localhost:3001,http://localhost:3000'),
 });

@@ -15,6 +15,7 @@
 | POST | `/login/customer` | Login as Customer | No |
 | POST | `/refresh` | Refresh Access Token (Rotation & Reuse Detection) | No |
 | POST | `/logout` | Logout (Revokes Refresh Token) | No |
+| POST | `/change-password` | **Change Password (SEC-H4)**. Revokes ALL sessions atomically. | Yes |
 | POST | `/verify-otp` | Verify OTP (for registration/login) | No |
 | POST | `/admin/register` | Register System Admin (First setup) | No |
 | POST | `/admin/login` | Login as System Admin | No |
@@ -33,6 +34,7 @@
 | PUT | `/admin/owners/:id/approve` | Approve pending Owner. Body: `{ subscriptionExpiry?: Date }` | Yes (Admin) |
 | PUT | `/admin/owners/:id/suspend` | Suspend Owner. Body: `{ reason?: string }` | Yes (Admin) |
 | PUT | `/admin/owners/:id/reactivate` | Reactivate suspended Owner | Yes (Admin) |
+| **POST** | **`/admin/security/suspend/:userId`** | **⚡ Kill Switch**: Ban user globally + revoke all sessions + Discord alert. Body: `{ userType: 'OWNER'|'STAFF'|'CUSTOMER' }` | Yes (Admin) |
 | GET | `/admin/export/customers` | **Export Global Customers (CSV)**. Audit Logged. | Yes (Admin) |
 | GET | `/admin/queues` | **Job Queue Dashboard**. Bull Board UI to monitor Background Tasks (Notifications/Cron). | Yes (Admin - UI) |
 
@@ -229,3 +231,34 @@
 *   `INVENTORY_LOW_STOCK`: Triggered when stock falls below minimum level.
 *   `INVENTORY_EXPIRY_ALERT`: Triggered daily for batches expiring within 30 days.
 *   `CATALOG_IMPORTED`: Triggered when a new global catalog CSV is imported (Owner/Manager only).
+
+---
+
+## 9. Quality Assurance 🧪
+
+### Test Status
+
+| Module | Tests | Status | Verified |
+| :--- | :--- | :--- | :--- |
+| **Inventory** | 7/7 | ✅ Passed | 2026-02-06 |
+| **Sales** | 5/5 | ✅ Passed | 2026-02-06 |
+| **Auth/Security** | 7/7 | ✅ Passed | 2026-02-06 |
+
+**Total**: 19 tests passed, 0 failed.
+
+### Test Command
+```bash
+npm run test -- --runInBand
+```
+
+### Critical Logic Verified
+- **FIFO/FEFO Stock Deduction**: Oldest/soonest-to-expire batches deducted first.
+- **Snapshot Pricing**: `costPrice` on `OrderItem` frozen at sale time.
+- **Atomic Transactions**: Multi-item orders rollback entirely on failure.
+- **Cross-Tenant Security**: PharmacyB cannot access PharmacyA inventory.
+- **Server-Side Pricing**: Client-supplied `price` is ignored.
+- **Token Rotation (SEC-01)**: New tokens issued, old tokens revoked on refresh.
+- **Logout Invalidation (SEC-02)**: Revoked token triggers security breach detection.
+- **Reuse Detection (SEC-H1)**: ALL tokens revoked + BullMQ security alert dispatched.
+- **Expired Token Rejection (SEC-H2)**: JWT expiry correctly rejected.
+- **Password Change Revocation (SEC-H4)**: All sessions killed atomically.

@@ -90,8 +90,39 @@
 Các vấn đề sau đã được nhận diện nhưng quyết định **Skip** (Chưa sửa ngay) vì không ảnh hưởng nghiêm trọng ở quy mô hiện tại:
 
 1.  **Distributed Lock**: Worker Inventory Reconciliation chưa có lock, có thể conflict nếu chạy đúng lúc bán hàng. (Chấp nhận vì xác suất thấp).
-2.  **Decimal Precision**: Có thể lệch 1-2 đồng do làm tròn. (Chấp nhận được).
+2.  **Decimal Precision**: Schema `Decimal(10,2)` chỉ hỗ trợ 2 số lẻ. Các test đã được điều chỉnh phù hợp.
 3.  **System Admin Ghost Mode**: Admin có thể xem data mà không log đặc biệt. (Chấp nhận vì Admin là Owner).
+
+---
+
+### 13. Quality Assurance & Testing 🧪
+**Status**: ☑️ DONE ✅
+
+**What was done**:
+- **Test Infrastructure**: Jest + ts-jest + `pharmacy_test` database configured.
+- **Test Factory**: `TestFactory` for creating mock entities (Pharmacy, Inventory, Batch, Customer, Staff, etc.).
+- **Inventory Tests (7/7 Passed)**:
+  - FIFO/FEFO deduction logic verified.
+  - Hell-Cases: Expiry filter, precise zero, multi-batch overflow, cross-tenant block.
+- **Sales Tests (5/5 Passed)**:
+  - Snapshot pricing integrity.
+  - Atomic rollback (no ghost orders).
+  - Decimal financial accuracy.
+  - Cross-tenant security.
+  - Negative price/quantity validation.
+- **Security/Auth Tests (9/9 Passed)** 🔐:
+  - Token Rotation Flow (SEC-01).
+  - Logout Invalidation (SEC-02).
+  - Cross-Role Token Rejection (SEC-03).
+  - Reuse Detection + BullMQ Alert (SEC-H1).
+  - Expired Zombie Token (SEC-H2).
+  - Impersonation Scope Leak (SEC-H3).
+  - Password Change Revocation (SEC-H4).
+  - **⚡ Kill Switch - Admin Ban (SEC-H5)**: 5 sessions revoked + Discord alert.
+  - **🖐️ God's Hand - Staff Ban (SEC-H6)**: Staff deactivated + Owner notified.
+
+**Total**: 21/21 Tests Passed.
+**Command**: `npm run test -- --runInBand`
 
 ---
 
@@ -169,3 +200,4 @@ Các vấn đề sau đã được nhận diện nhưng quyết định **Skip**
 | `owners` | `subscription_expiry` | DateTime (nullable) | Subscription tracking |
 | `pharma_sales_reps`| `last_otp`, `otp_expires_at`, `is_verified` | String, DateTime, Boolean | OTP-based authentication |
 | `global_medicine_catalog` | `status` | Enum (PENDING/APPROVED/REJECTED) | Catalog approval workflow |
+| `inventory_batches` | `stock_quantity` | Int | **Limitation**: Cannot support fractional units (Decimal) yet [INV-H5] |

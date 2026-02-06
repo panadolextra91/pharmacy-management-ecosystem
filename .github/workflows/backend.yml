@@ -69,21 +69,24 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pharmacy_db_test
 
-      - name: Run database migrations
+      - name: Setup Test Database Schema
         working-directory: ./backend
-        run: npx prisma migrate deploy
+        # 👇 Dùng db push thay vì migrate deploy - tạo schema trực tiếp từ schema.prisma
+        run: npx prisma db push --skip-generate --accept-data-loss
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pharmacy_db_test
 
       - name: Run tests
         working-directory: ./backend
-        run: npm test
+        run: npm test -- --runInBand --forceExit
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pharmacy_db_test
           REDIS_URL: redis://localhost:6379
           NODE_ENV: test
           JWT_SECRET: test-jwt-secret-minimum-32-characters-long
           JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
+          JWT_EXPIRES_IN: 7d
+          JWT_REFRESH_EXPIRES_IN: 7d
           CLOUDINARY_CLOUD_NAME: test
           CLOUDINARY_API_KEY: test
           CLOUDINARY_API_SECRET: test
