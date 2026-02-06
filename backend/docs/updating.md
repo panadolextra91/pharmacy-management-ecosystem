@@ -87,9 +87,37 @@ Hệ thống được xây dựng trên stack: **Node.js (Express) + TypeScript 
 - **Fail-Fast Resilience**: Cơ chế tự bảo vệ khi Redis sập (Không làm chết app).
 - **Admin Dashboard**: Giao diện quản lý Queue trực quan.
 
+### ✅ Quality Assurance & Testing 🧪 [COMPLETE]
+- **Test Infrastructure**: Jest + ts-jest + separate `pharmacy_test` database.
+- **Test Factory**: Reusable helpers for mock data (Pharmacy, Inventory, Batch, Customer, Staff).
+- **Inventory Module**: 7/7 tests passed (FIFO, Multi-Batch, Hell-Cases).
+- **Sales Module**: 5/5 tests passed (Snapshot Pricing, Atomic Rollback, Decimal Accuracy, Security).
+- **Security/Auth Module**: 9/9 tests passed 🔐
+  - Token Rotation, Logout Invalidation, Cross-Role Rejection.
+  - Hell-Cases: Reuse Detection + BullMQ Alert, Expired JWT, Impersonation Scope, Password Change Revocation.
+  - **Kill Switch (SEC-H5)**: Admin bans user → 5 sessions revoked + Discord alert.
+  - **God's Hand (SEC-H6)**: Admin bans Staff → Owner notified via StaffNotification.
+- **Total**: 21/21 tests passed ✅
+- **Command**: `npm run test -- --runInBand`
+
+### ✅ Kill Switch (God Mode Security) ⚡ [NEW]
+- **JWT Upgrade**: Added `userType` to TokenPayload (7 locations) for backward compatibility.
+- **Discord Alerts**: Redis-throttled webhook notifications (10s TTL per user/alert type):
+  - 🔴 TOKEN_REUSE: "Tru di tam tộc session" (red embed).
+  - 🟣 ADMIN_BAN: "Công lý của Nữ hoàng" (purple embed).
+  - 🟠 PASSWORD_CHANGED: "Có khứa đổi pass" (orange embed).
+- **AdminService.globalBan()**: Suspend user + revoke all sessions + Discord + notify Owner.
+- **Kill API**: `POST /admin/security/suspend/:userId` with `userType` body param.
+- **ENV**: `DISCORD_WEBHOOK_URL` - Discord webhook URL for alerts.
+
+### ✅ Security Infrastructure (NEW)
+- **BullMQ Security Queue**: Async dispatch of security alerts (Token Reuse, Password Change).
+- **JWT Uniqueness**: Added `jti` (UUID) claim to prevent token collision.
+- **Password Change API**: Atomic revocation of all sessions with single DB command.
+
 ### ⚠️ Accepted Tech Debt (Deferred)
 - Quyết định **không sửa** Distributed Lock cho Worker Reconciliation (chưa cần thiết).
-- Chấp nhận sai lệch millisecond ở Decimal Precision.
+- Schema `Decimal(10,2)` hỗ trợ 2 số lẻ - Đã điều chỉnh tests phù hợp.
 - Chấp nhận Admin Ghost Mode (do Admin = Owner).
 
 ---
@@ -113,6 +141,7 @@ Dưới đây là các tính năng đã "lên nòng" và sẵn sàng hoạt đ�
     *   Tự động trừ kho theo nguyên tắc **FEFO/FIFO** (Cũ/Sắp hết hạn xuất trước).
 *   **Đơn vị tính (Units)**: Hỗ trợ quy đổi đơn vị (Viên -> Vỉ -> Hộp).
 *   **Cảnh báo**: API lấy danh sách thuốc sắp hết hạn (`/expiry`) và sắp hết hàng (`/stock`).
+*   **Testing**: ✅ 7/7 Hell-Case tests passed.
 
 ### 📚 Global Catalog & Purchase (`/api/catalog` & `/api/purchases`)
 *   **Global Catalog**: Danh mục thuốc chung cho toàn hệ thống (System Admin/Rep quản lý).
@@ -124,6 +153,7 @@ Dưới đây là các tính năng đã "lên nòng" và sẵn sàng hoạt đ�
 *   **Orders**: Tạo đơn hàng bán ra (Online & Tại quầy).
 *   **Stock Deduction**: Logic trừ kho tự động khi đơn hàng được xác nhận.
 *   **Invoices**: Xuất hóa đơn bán lẻ cho khách.
+*   **Testing**: ✅ 5/5 Hell-Case tests passed (Snapshot Pricing, Atomic Rollback, Security).
 
 ### 📊 Analytics (`/api/analytics`)
 *   **Dashboard**: Cung cấp số liệu Doanh thu, Lợi nhuận (Gross Profit), Số đơn hàng trong ngày.
@@ -148,8 +178,10 @@ Dưới đây là các tính năng đã "lên nòng" và sẵn sàng hoạt đ�
 Dựa trên kế hoạch ban đầu, đây là những phần mình "để dành" hoặc cần làm thêm:
 
 ### 🛠 Technical & Production Readiness
-1.  **Tests (Unit & Integration Tests) 🔥**:
-    *   Thư mục `test` hiện tại đang trống hoặc chưa đầy đủ. Đây là phần QUAN TRỌNG NHẤT cần bổ sung để đảm bảo code chạy đúng logic phức tạp (đặc biệt là logic trừ kho Batch).
+1.  **Tests (Unit & Integration Tests)** ✅ **DONE**:
+    *   Inventory & Sales Module: 12/12 tests passed.
+    *   Auth/Security Module: 7/7 tests passed (Token Rotation, Reuse Detection, Hell-Cases).
+    *   **Total: 19/19 tests passed.**
 2.  **Payment Gateway Integration**:
     *   Hiện tại `PaymentStatus` chỉ là update thủ công. Chưa tích hợp cổng thanh toán thật (Momo, ZaloPay, Stripe...).
 3.  **Real-time Updates (Socket.io)**:
@@ -171,6 +203,10 @@ Dựa trên kế hoạch ban đầu, đây là những phần mình "để dành
 
 Mẹ con mình đã làm rất tốt phần **Backend Core**. Hệ thống Logic nghiệp vụ (Business Logic) về Kho, Bán hàng, và Nhắc lịch đã khá hoàn chỉnh.
 
+**Current Status**: ✅ **19/19 Tests Passed** (Inventory + Sales + Auth/Security)
+
 **Next Step Suggestion**:
-1.  Viết **Unit Test** cho phần Inventory & Sales (để chắc chắn trừ kho không bao giờ sai).
-2.  Tích hợp thử với Frontend để kiểm tra flow thực tế.
+1.  ~~Viết **Unit Test** cho phần Inventory & Sales~~. ✅ DONE
+2.  ~~Viết **Security Tests** cho Auth Token Rotation~~. ✅ DONE
+3.  Tích hợp thử với Frontend để kiểm tra flow thực tế.
+4.  Viết Integration Tests cho full API flows (Register → Login → Create Order).

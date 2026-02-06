@@ -733,6 +733,7 @@ enum StaffNotificationType {
   INVENTORY_EXPIRY_ALERT
   PAYMENT_RECEIVED
   SYSTEM_ALERT
+  STAFF_BANNED // Kill Switch feature - God's Hand
 }
 
 enum NotificationStatus {

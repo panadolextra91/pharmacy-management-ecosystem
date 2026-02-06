@@ -38,6 +38,28 @@ router.put('/admin/owners/:id/approve', authenticate, requireSystemAdmin, ownerM
 router.put('/admin/owners/:id/suspend', authenticate, requireSystemAdmin, ownerManagementController.suspendOwner.bind(ownerManagementController));
 router.put('/admin/owners/:id/reactivate', authenticate, requireSystemAdmin, ownerManagementController.reactivateOwner.bind(ownerManagementController));
 
+// System Admin - Kill Switch API ⚡ (God's Hand)
+router.post('/admin/security/suspend/:userId', authenticate, requireSystemAdmin, async (req, res, next) => {
+  try {
+    const { userId } = req.params;
+    const { userType } = req.body;
+    const adminEmail = (req as any).user?.email || 'system';
+
+    if (!userType || !['OWNER', 'STAFF', 'CUSTOMER'].includes(userType)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid userType. Must be OWNER, STAFF, or CUSTOMER'
+      });
+    }
+
+    const adminService = (await import('../../application/admin.service')).default;
+    const result = await adminService.globalBan(userId, userType, adminEmail);
+    return res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // System Admin - Data Export 📥
 router.get('/admin/export/customers', authenticate, requireSystemAdmin, dataExportController.exportCustomers.bind(dataExportController));
 

@@ -1,5 +1,6 @@
 import * as jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import env from '../config/env';
 import { TokenPayload } from '../../modules/access-control/application/dtos';
 
@@ -7,7 +8,7 @@ export type { TokenPayload };
 
 export function generateAccessToken(payload: TokenPayload): string {
   return jwt.sign(
-    payload as object,
+    { ...payload, jti: randomUUID() } as object, // Add unique JWT ID
     env.JWT_SECRET,
     { expiresIn: env.JWT_EXPIRES_IN } as SignOptions
   );
@@ -15,7 +16,7 @@ export function generateAccessToken(payload: TokenPayload): string {
 
 export function generateRefreshToken(payload: TokenPayload): string {
   return jwt.sign(
-    payload as object,
+    { ...payload, jti: randomUUID() } as object, // Add unique JWT ID
     env.JWT_REFRESH_SECRET,
     { expiresIn: env.JWT_REFRESH_EXPIRES_IN } as SignOptions
   );

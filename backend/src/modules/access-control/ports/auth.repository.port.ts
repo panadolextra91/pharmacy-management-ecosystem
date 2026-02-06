@@ -45,4 +45,10 @@ export interface IAuthRepository {
     findRefreshToken(token: string): Promise<any | null>;
     revokeRefreshToken(token: string, replacedBy?: string): Promise<void>;
     revokeAllUserTokens(userId: string, role: string): Promise<void>;
+
+    // Password Management (SEC-H4)
+    findOwnerById(id: string): Promise<OwnerEntity | null>;
+    findCustomerById(id: string): Promise<CustomerEntity | null>;
+    findStaffByIdForPassword(id: string): Promise<StaffEntity | null>;
+    updatePassword(userId: string, role: string, hashedPassword: string): Promise<void>;
 }

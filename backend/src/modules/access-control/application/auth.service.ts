@@ -55,6 +55,7 @@ export class AuthService {
             id: owner.id,
             email: owner.email,
             role: 'OWNER',
+            userType: 'OWNER',
         };
 
         return this.generateAuthResponse(tokenPayload, {
@@ -99,6 +100,7 @@ export class AuthService {
             id: owner.id,
             email: owner.email,
             role: 'OWNER',
+            userType: 'OWNER',
         };
 
         const pharmacies = await this.repository.findPermittedPharmacies(owner.id);
@@ -138,6 +140,7 @@ export class AuthService {
             id: staff.id,
             email: staff.email,
             role: staff.role,
+            userType: 'STAFF',
             pharmacyId: staff.pharmacyId,
         };
 
@@ -171,6 +174,7 @@ export class AuthService {
             id: staff.id,
             email: staff.email,
             role: staff.role,
+            userType: 'STAFF',
             pharmacyId: staff.pharmacyId,
         };
 
@@ -207,6 +211,7 @@ export class AuthService {
             id: customer.id,
             phone: customer.phone,
             role: 'CUSTOMER',
+            userType: 'CUSTOMER',
         };
 
         return this.generateAuthResponse(tokenPayload, {
@@ -244,6 +249,7 @@ export class AuthService {
             id: customer.id,
             phone: customer.phone,
             role: 'CUSTOMER',
+            userType: 'CUSTOMER',
         };
 
         return this.generateAuthResponse(tokenPayload, {
@@ -291,6 +297,7 @@ export class AuthService {
             id: customer.id,
             phone: customer.phone,
             role: 'CUSTOMER',
+            userType: 'CUSTOMER',
         };
 
         return this.generateAuthResponse(tokenPayload, {
@@ -360,6 +367,16 @@ export class AuthService {
 
             await this.repository.revokeAllUserTokens(userId, role);
 
+            // Dispatch async security alert job (non-blocking)
+            const { addSecurityJob, SecurityJobType } = await import('../../../shared/config/security.queue');
+            addSecurityJob(SecurityJobType.SECURITY_ALERT, {
+                userId,
+                role,
+                alertType: 'TOKEN_REUSE',
+                email: storedToken.owner?.email || storedToken.staff?.email || storedToken.customer?.email,
+                metadata: { revokedTokenId: storedToken.id }
+            }).catch(err => console.error('[Security Queue] Failed to dispatch alert:', err));
+
             throw new AppError('Security breach detected. Please log in again.', 403, 'SECURITY_BREACH_LOGOUT');
         }
 
@@ -395,6 +412,65 @@ export class AuthService {
 
     async logout(refreshToken: string): Promise<void> {
         await this.repository.revokeRefreshToken(refreshToken);
+    }
+
+    // SEC-H4: Change Password with atomic token revocation
+    async changePassword(userId: string, role: string, oldPassword: string, newPassword: string): Promise<{ success: boolean; message: string }> {
+        // 1. Verify old password
+        let user: any;
+        if (role === 'OWNER') {
+            user = await this.repository.findOwnerById(userId);
+        } else if (role === 'CUSTOMER') {
+            user = await this.repository.findCustomerById(userId);
+        } else if (['STAFF', 'PHARMACIST', 'MANAGER'].includes(role)) {
+            user = await this.repository.findStaffByIdForPassword(userId);
+        }
+
+        if (!user) {
+            throw new AppError('User not found', 404, 'USER_NOT_FOUND');
+        }
+
+        const isValidPassword = await bcrypt.compare(oldPassword, user.password);
+        if (!isValidPassword) {
+            throw new AppError('Invalid old password', 401, 'INVALID_PASSWORD');
+        }
+
+        // 2. Update password (atomic single DB operation)
+        const hashedPassword = await bcrypt.hash(newPassword, SALT_ROUNDS);
+        await this.repository.updatePassword(userId, role, hashedPassword);
+
+        // 3. Revoke ALL tokens atomically (single DB command - no queue flooding!)
+        await this.repository.revokeAllUserTokens(userId, role);
+
+        // 4. Dispatch security alert + Discord notification
+        const { addSecurityJob, SecurityJobType } = await import('../../../shared/config/security.queue');
+
+        // Email alert
+        addSecurityJob(SecurityJobType.SECURITY_ALERT, {
+            userId,
+            role,
+            alertType: 'PASSWORD_CHANGED',
+            email: user.email,
+            metadata: { changedAt: new Date().toISOString() }
+        }).catch(err => console.error('[Security Queue] Failed to dispatch password change alert:', err));
+
+        // Discord alert (Kill Switch feature)
+        addSecurityJob(SecurityJobType.DISCORD_ALERT, {
+            alertType: 'PASSWORD_CHANGED',
+            userId,
+            userType: role
+        }).catch(err => console.error('[Security Queue] Failed to dispatch Discord alert:', err));
+
+        return { success: true, message: 'Password changed successfully. Please log in again.' };
+    }
+
+    /**
+     * Kill Switch - Revoke all sessions for a user
+     * Exposed for AdminService.globalBan()
+     */
+    async revokeAllSessions(userId: string, role: string): Promise<void> {
+        await this.repository.revokeAllUserTokens(userId, role);
+        console.log(`[AuthService] All sessions revoked for ${role}:${userId}`);
     }
 
     private async generateAuthResponse(tokenPayload: TokenPayload, userData: any): Promise<AuthResponse> {

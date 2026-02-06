@@ -145,7 +145,12 @@ export class PrismaInventoryRepository implements IInventoryRepository {
             let remainingToDeduct = quantity;
 
             const batches = await client.inventoryBatch.findMany({
-                where: { inventoryId, stockQuantity: { gt: 0 }, isDeleted: false },
+                where: {
+                    inventoryId,
+                    stockQuantity: { gt: 0 },
+                    isDeleted: false,
+                    expiryDate: { gt: new Date() } // FIX: INV-H1 - Ignore expired batches
+                },
                 orderBy: { expiryDate: 'asc' }
             });
 
