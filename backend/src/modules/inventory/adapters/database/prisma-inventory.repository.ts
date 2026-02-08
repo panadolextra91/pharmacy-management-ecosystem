@@ -117,7 +117,7 @@ export class PrismaInventoryRepository implements IInventoryRepository {
         });
     }
 
-    async deductStock(inventoryId: string, _pharmacyId: string, quantity: number, tx?: any): Promise<InventoryEntity> {
+    async deductStock(inventoryId: string, pharmacyId: string, quantity: number, tx?: any): Promise<InventoryEntity> {
         const execute = async (client: any) => {
             // 1. ATOMIC GUARD: Decrement Total Stock first to reserve quantity
             // This prevents Race Conditions. If 2 requests try to sell last item, one will fail here.
@@ -125,6 +125,7 @@ export class PrismaInventoryRepository implements IInventoryRepository {
             const result = await client.pharmacyInventory.updateMany({
                 where: {
                     id: inventoryId,
+                    pharmacyId, // Strict tenant check
                     totalStockLevel: { gte: quantity } // Constraint: Must have enough stock
                 },
                 data: {
