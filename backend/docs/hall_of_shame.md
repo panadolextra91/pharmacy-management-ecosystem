@@ -50,10 +50,11 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 
 ## 3. Code Quality: "Mùi" Code (Code Smells) 👃
 
-### 🟠 [HIGH] Vấn đề: Ép kiểu thô bạo `as any` (InventoryService.ts)
+### 🟢 [FIXED] Vấn đề: Ép kiểu thô bạo `as any` (InventoryService.ts)
 *   **Mô tả**: `(this.repository as any).deductStock(...)`.
 *   **Hậu quả**: Code này bypass Type Checker. Nếu ai đó đổi tên hàm `deductStock` trong Repository, code vẫn compile ngon lành nhưng **Crash** banh xác khi chạy thật (Runtime Error).
 *   **Giải pháp**: Khai báo method `deductStock` vào Interface `IInventoryRepository`.
+    > **Status (Feb 2026)**: Đã cập nhật `IInventoryRepository` và bỏ toàn bộ `as any` trong `InventoryService`.
 
 ### 🟡 [MEDIUM] Vấn đề: Entity Types Outdated (AuthService.ts)
 *   **Mô tả**: `(owner as any).status`.
