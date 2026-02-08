@@ -1,9 +1,12 @@
+export type OwnerStatus = 'PENDING' | 'ACTIVE' | 'SUSPENDED';
+
 export interface OwnerEntity {
     id: string;
     email: string;
     password?: string;
     name: string;
     phone?: string | null;
+    status: OwnerStatus;
     isActive: boolean;
     createdAt: Date;
     updatedAt: Date;
