@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcrypt';
 import { AppError } from '../../../shared/middleware/error-handler.middleware';
+import logger from '../../../shared/utils/logger';
 import {
     RegisterOwnerDto,
     LoginOwnerDto,
@@ -268,7 +269,7 @@ export class AuthService {
         await this.repository.deleteUnusedOtps(phone);
         await this.repository.createOtp({ phone, otp, expiresAt });
 
-        console.log(`OTP for ${phone}: ${otp}`);
+        logger.debug(`OTP for ${phone}: ${otp}`);
 
         return { success: true, message: 'OTP sent successfully' };
     }

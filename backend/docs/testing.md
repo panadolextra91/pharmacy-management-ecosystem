@@ -13,6 +13,7 @@ This document tracks the progress and results of the automated testing initiativ
 *   [x] **Test Runner**: Jest + ts-jest configured.
 *   [x] **Factories**: `TestFactory` implemented for creating mock `Pharmacy`, `Inventory`, `Batch`, `Owner`, etc.
 *   [x] **Real-Time Verification**: `scripts/test_realtime.ts` automation script added.
+*   [x] **Log Suppression Verification**: Verified `logger.debug` suppression in Production mode.
 
 ---
 
@@ -63,6 +64,7 @@ This document tracks the progress and results of the automated testing initiativ
 | **SEC-H4** | **Password Change Revocation** | ✅ Passed | All 3 sessions killed atomically, single BullMQ alert. |
 | **SEC-H5** | **⚡ Kill Switch (Admin Ban)** | ✅ Passed | Admin bans Owner via `POST /api/auth/admin/security/suspend/:userId` → 5 sessions revoked + Discord alert + status SUSPENDED. |
 | **SEC-H6** | **🖐️ God's Hand (Staff Ban)** | ✅ Passed | Admin bans Staff → Staff deactivated + Owner notified via StaffNotification. |
+| **SEC-H7** | **Log Leak Prevention** | ✅ Passed | Verified OTP is visible in Dev logs but HIDDEN in Production logs (via Winston level). |
 
 ### Key Fixes Applied During Tests
 | Issue | Root Cause | Fix |
@@ -78,9 +80,9 @@ This document tracks the progress and results of the automated testing initiativ
 | :--- | :--- | :--- | :--- |
 | Inventory | 7/7 | ✅ All Passed | 2026-02-06 |
 | Sales | 5/5 | ✅ All Passed | 2026-02-06 |
-| **Auth/Security** | **9/9** | ✅ All Passed | 2026-02-06 |
+| **Auth/Security** | **10/10** | ✅ All Passed | 2026-02-08 |
 
-**Total**: 21 tests passed, 0 failed.
+**Total**: 22 tests passed, 0 failed.
 
 ---
 

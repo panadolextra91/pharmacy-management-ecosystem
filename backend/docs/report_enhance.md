@@ -7,7 +7,7 @@ This section demonstrates the critical shift from the Pre-thesis (Proof of Conce
 System Pillar	Pre-Thesis (Legacy Monolith)	Thesis (Enhanced SaaS Ecosystem)	Academic/Business Value
 1. Architecture	Layered Monolith: Tightly coupled logic. API, Business, and Data layers mixed. Hard to maintain or test.	Modular Hexagonal: Strict separation of concerns (Domain vs Infrastructure). Uses Ports & Adapters pattern.	Maintainability: 40% reduction in regression bugs.
 Testability: 100% unit test coverage for Domain logic.
-2. Security & Forensic	Basic Auth: Simple JWT (Access Token only). No audit trail. Vulnerable to Replay Attacks.	Zero-Trust Security: Token Rotation (Refresh Tokens), Detection of Token Reuse, Kill Switch (Global Ban), Immutable Audit Logs.	Integrity: NIST-compliant authentication flow.
+2. Security & Forensic	Basic Auth: Simple JWT (Access Token only). No audit trail. Vulnerable to Replay Attacks.	Zero-Trust Security: Token Rotation (Refresh Tokens), Detection of Token Reuse, Kill Switch (Global Ban), Immutable Audit Logs, **Secure Logging (No sensitive data in Production logs).**	Integrity: NIST-compliant authentication flow.
 Non-repudiation: Forensic-ready audit trails.
 3. Multi-tenancy	Single Tenant: One database per pharmacy instance. No data isolation logic needed.	Logical Separation (SaaS): Shared Database with Row-Level Security logic. Context-aware data isolation.	Scalability: Logarithmic cost scaling (1000 pharmacies on 1 DB cluster).
 4. Inventory Intelligence	Simple Stock: Quantity = Quantity - 1. No batch tracking.	FIFO/FEFO Algorithm: Automatic batch selection based on Expiry Date. Snapshot Pricing for financial accuracy.	Compliance: Adheres to GPP (Good Pharmacy Practice).

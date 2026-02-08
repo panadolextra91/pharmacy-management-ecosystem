@@ -296,6 +296,7 @@ const customer = await TestFactory.createCustomer();
 | **Security** | SEC-H4 | Password change revokes all sessions |
 | **Security** | **SEC-H5** | ⚡ Kill Switch: Admin bans user, 5 sessions revoked |
 | **Security** | **SEC-H6** | 🖐️ God's Hand: Staff ban → Owner notified |
+| **Security** | **SEC-H7** | Log Leak Prevention: OTP suppressed in Prod |
 
 ---
 

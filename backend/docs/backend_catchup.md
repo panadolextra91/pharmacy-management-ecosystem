@@ -1,5 +1,5 @@
 # Backend Development Status & Catch-up Report
-**Date:** February 6, 2026
+**Date:** February 8, 2026
 **Phase:** Phase 2 (DevOps & Infrastructure)
 **Overall Progress:** ~90% of Phase 2 (Evidence & Optimization Ready)
 
@@ -30,6 +30,8 @@
 - **Isolation Logic**:
   - `pharmacy_id` applied in all Tenant-scoped repositories.
   - Multi-tenant data segregation verified in Prisma logic.
+- **Security Hardening**:
+  - ✅ **OTP Leakage Fixed**: Replaced `console.log` with centralized `logger.debug` (suppressed in Production).
 
 ### ⚠️ Works in Progress / Technical Debts
 1.  **Redis Caching (Critical for Scale)**
