@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import prisma from '../../../../shared/config/database';
 import { createTenantPrisma } from '../../../../shared/prisma/client';
 import { IInventoryRepository } from '../../ports/inventory.repository.port';
@@ -184,6 +186,100 @@ export class PrismaInventoryRepository implements IInventoryRepository {
         } else {
             return prisma.$transaction(execute);
         }
+    }
+
+    /**
+     * ATOMIC SALES DEDUCTION (Fixed for Issue 4)
+     * Deducts stock and returns exact cost price based on FIFO batches used.
+     * Uses Decimal for financial precision.
+     */
+    async deductStockWithCost(
+        inventoryId: string,
+        pharmacyId: string,
+        quantity: number,
+        tx: Prisma.TransactionClient
+    ): Promise<{
+        inventory: InventoryEntity;
+        costPrice: Decimal;
+        deductedBatches: { batchId: string; quantity: number; cost: Decimal }[]
+    }> {
+        // 1. ATOMIC GUARD: Decrement Total Stock
+        const result = await tx.pharmacyInventory.updateMany({
+            where: {
+                id: inventoryId,
+                pharmacyId,
+                totalStockLevel: { gte: quantity }
+            },
+            data: {
+                totalStockLevel: { decrement: quantity }
+            }
+        });
+
+        if (result.count === 0) {
+            const current = await tx.pharmacyInventory.findUnique({ where: { id: inventoryId } });
+            if (!current) throw new Error('Inventory verified but not found during update (Unreachable)');
+            throw new Error(`Insufficient stock for ${current.name}. Available: ${current.totalStockLevel}, Requested: ${quantity}`);
+        }
+
+        // 2. FIFO BATCH DEDUCTION & COST CALCULATION
+        let remainingToDeduct = quantity;
+        const deductedBatches: { batchId: string; quantity: number; cost: Decimal }[] = [];
+        let totalValue = new Decimal(0);
+        let totalQtyCalculated = 0;
+
+        const batches = await tx.inventoryBatch.findMany({
+            where: {
+                inventoryId,
+                stockQuantity: { gt: 0 },
+                isDeleted: false,
+                expiryDate: { gt: new Date() }
+            },
+            orderBy: { expiryDate: 'asc' }
+        });
+
+        for (const batch of batches) {
+            if (remainingToDeduct <= 0) break;
+            const deductAmount = Math.min(batch.stockQuantity, remainingToDeduct);
+
+            await tx.inventoryBatch.update({
+                where: { id: batch.id },
+                data: { stockQuantity: { decrement: deductAmount } }
+            });
+
+            // Calculate cost
+            const batchCost = batch.purchasePrice ? new Decimal(batch.purchasePrice) : new Decimal(0);
+            const batchValue = batchCost.mul(deductAmount);
+
+            totalValue = totalValue.add(batchValue);
+            totalQtyCalculated += deductAmount;
+
+            deductedBatches.push({
+                batchId: batch.id,
+                quantity: deductAmount,
+                cost: batchCost
+            });
+
+            remainingToDeduct -= deductAmount;
+        }
+
+        // 3. Weighted Average Cost
+        // Safety check for division by zero (though unlikely if quantity >= 1 and total stock check passed)
+        let costPrice = new Decimal(0);
+        if (totalQtyCalculated > 0) {
+            costPrice = totalValue.div(totalQtyCalculated);
+        }
+
+        // 4. Return updated inventory
+        const updatedInventory = await tx.pharmacyInventory.findUnique({
+            where: { id: inventoryId },
+            include: { units: true }
+        });
+
+        return {
+            inventory: updatedInventory as unknown as InventoryEntity,
+            costPrice,
+            deductedBatches
+        };
     }
 
     // --- Batch Methods ---

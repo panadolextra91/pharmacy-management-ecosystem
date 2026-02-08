@@ -10,7 +10,7 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 *   **Mẹ sửa thế nào?**: Phải đưa bước kiểm tra tồn kho vào **trong** transaction và sử dụng lệnh `SELECT ... FOR UPDATE` (hoặc cơ chế `increment/decrement` trực tiếp của Prisma) để khóa dòng dữ liệu đó lại.
     > **Update (Feb 2026)**: Đã implement Atomic Decrement Guard trong `PrismaInventoryRepository.deductStock` (Tier 5).
 
-### 🔴 [CRITICAL] Vấn đề: Snapshot Pricing "Lệch Pha" (SalesService.ts)
+### 🟢 [FIXED] Vấn đề: Snapshot Pricing "Lệch Pha" (SalesService.ts)
 *   **Mô tả**: Hàm `getOldestBatchCost` lấy giá vốn (COGS) **trước** khi Transaction bắt đầu. Nhưng `deductStock` lại chạy **sau** khi Transaction đã commit (hoặc trong transaction nhưng logic tách biệt).
 *   **Hậu quả**: Nếu 2 đơn hàng cùng bán 1 sản phẩm lô cũ:
     *   Đơn A lấy giá vốn Lô X.
@@ -18,6 +18,9 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
     *   Thực tế: Đơn A trừ hết Lô X -> Đơn B phải trừ sang Lô Y (giá khác).
     *   => Đơn B lưu `costPrice` của Lô X nhưng kho lại trừ Lô Y. **Lệch báo cáo tài chính!**
 *   **Giải pháp**: Phải move logic lấy `costPrice` vào **bên trong** Transaction cùng lúc với `deductStock`. Trả về costPrice thực tế sau khi trừ.
+    > **Status (Feb 2026)**: Đã FIX thành công!
+    > *   Implement `deductStockWithCost` xử lý atomic cả trừ kho lẫn tính giá trong cùng 1 transaction.
+    > *   Verified bằng "Highlander Test" (Race Condition) và "Hybrid Box Test" (Weighted Average Cost).
 
 ### 🟡 [ACCEPTED RISK] Vấn đề: Worker "tự tay bóp team" trong `runInventoryReconciliation`
 *   **Mô tả**: Worker này chạy mỗi giờ để kiểm tra sự chênh lệch giữa kho tổng và kho lô. Tuy nhiên, nó loop qua từng item và cập nhật giá trị mà **không khóa dữ liệu**.
@@ -81,4 +84,4 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 > 1. [x] Fix `console.log(otp)` gấp.
 > 2. [x] Update Interface `IInventoryRepository` để bỏ cái `as any`.
 > 3. [x] Update `Owner` Entity để bỏ cái `as any`.
-> 4. Fix logic `SalesService` (Cost Price Race Condition) - Cái này khoai, cần suy nghĩ kỹ.
+> 4. [x] Fix logic `SalesService` (Cost Price Race Condition) - Đã xử lý (Atomic Transaction + Decimal Precision).

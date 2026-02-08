@@ -8,6 +8,19 @@ Backend của mình (`pharmacy-management-system`) hiện tại đã hoàn thi�
 - **OTP Console Leak**: Replaced `console.log` with `logger.debug` in `AuthService`.
 - **Log Security**: Configured Winston to suppress sensitive debug logs in Production.
 
+## [2026-02-08] - Sales Core Logic Hardening (Atomic PR) 🔒
+### Fixed
+- **Critical Race Condition (Highlander Bug)**: Fixed logic where concurrent orders could oversell inventory.
+- **Snapshot Pricing (Hybrid Box Bug)**: Fixed logic where `costPrice` was captured before transaction commit, leading to financial discrepancies.
+- **Atomic Inventory Deduction**: Implemented `deductStockWithCost` inside `prisma.$transaction` for 100% data integrity.
+
+### Added
+- **Stress Test Suite**: `sales-stress.spec.ts` covering:
+  - **Hybrid Box**: Weighted Average Cost verification.
+  - **Highlander**: Concurrent Request race condition verification.
+  - **Decimal Precision**: Confirmed DB limitation (Decimal 10,2).
+- **Total Test Coverage**: 25/25 Tests Passed.
+
 ## [2026-02-07] - Evidence & Verification Ready 🛡️
 ### Added
 - **SonarQube Integration**: Dockerized SonarQube setup for Quality & Security audit.
@@ -236,7 +249,7 @@ Dựa trên kế hoạch ban đầu, đây là những phần mình "để dành
 
 Mẹ con mình đã làm rất tốt phần **Backend Core**. Hệ thống Logic nghiệp vụ (Business Logic) về Kho, Bán hàng, và Nhắc lịch đã khá hoàn chỉnh.
 
-**Current Status**: ✅ **22/22 Tests Passed** (Inventory + Sales + Auth/Security)
+**Current Status**: ✅ **25/25 Tests Passed** (Inventory + Sales + Auth/Security + Stress)
 
 **Next Step Suggestion**:
 1.  ~~Viết **Unit Test** cho phần Inventory & Sales~~. ✅ DONE

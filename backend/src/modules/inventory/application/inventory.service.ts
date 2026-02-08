@@ -61,6 +61,21 @@ export class InventoryService {
         return this.repository.deductStock(inventoryId, pharmacyId, quantity, tx);
     }
 
+    /**
+     * ATOMIC SALES DEDUCTION (Fixed for Issue 4)
+     * Deducts stock and returns exact cost price based on FIFO batches used.
+     */
+    async deductStockWithCost(
+        inventoryId: string,
+        pharmacyId: string,
+        quantity: number,
+        tx: any
+    ) {
+        // We do NOT call findById here because the repository method 
+        // handles the atomic existence + stock check in one query.
+        return this.repository.deductStockWithCost(inventoryId, pharmacyId, quantity, tx);
+    }
+
     async getExpiryAlerts(pharmacyId: string, days: number = 30) {
         const date = new Date();
         date.setDate(date.getDate() + days);
