@@ -57,56 +57,8 @@ export class InventoryService {
     }
 
     async deductStock(inventoryId: string, pharmacyId: string, quantity: number, tx?: any) {
-        const inventory = await this.findById(inventoryId, pharmacyId);
-
-        if (inventory.totalStockLevel < quantity) {
-            throw new AppError('Insufficient stock', 400, 'INSUFFICIENT_STOCK');
-        }
-
-        // Logic here is complex (FIFO).
-        // For strict Clean Arch, we should fetch batches -> calculation in Domain -> save results.
-        // But concurrency requires DB locking.
-        // For now, I'll rely on Prisma Transaction which is simplest to keep robust.
-        // I will implement a specialized method in the Repository for this complex operation 
-        // OR construct it here using a TransactionRunner if we had one.
-
-        // Since I didn't add deductStockTransaction to the interface, let's implement the logic here
-        // BUT calling prisma directly violates the rule.
-        // Solution: Add deductStockFIFO method to the Repository Interface.
-
-        // Re-reading IInventoryRepository: I didn't add deductStockFIFO.
-        // I will assume I can update the repository to include this, OR use the existing prisma import just for this tricky part 
-        // UNTILL we implement a proper TransactionManager.
-
-        // Let's go with the PRAGMATIC approach: Move `deductStock` logic ENTIRELY to the Repository 
-        // because it is highly coupled with Database Transaction mechanism.
-        // Wait, I need to update the Interface first then.
-
-        // Actually, looking at the previous file content for Repository, I don't see deductStock there. 
-        // I will implement it in the generic 'updateTotalStock' or similar? No.
-
-        // I'll add `deductStock` to the Repository implementation specifically for the Service to use.
-        // And I will dynamically cast repository to `any` or update the interface file in next step if needed.
-        // Better: I will use the Prisma instance inside Repository and expose `deductStock` method there.
-        // Since I cannot edit the Interface file in this single turn (I already wrote it), 
-        // I will use a direct call assuming the repository has it, or I will update the interface in the next turn.
-
-        // Let's pretend I added `deductStock` to the interface (I see I missed it in step 105).
-        // I will invoke it here, and I will fix the Interface and Repository Implementation in the next turns if needed.
-
-        // Actually, I can just implement the logic here using simple repo calls (non-atomic risk)
-        // OR better: I will utilize the fact that `PrismaInventoryRepository` is physically present.
-
-        // Correct Action: I will implement `deductStock` in `PrismaInventoryRepository` (I missed adding it to the class in previous step)
-        // and then call it here.
-
-        // Since I missed adding `deductStock` to the Repo class in step 108:
-        // I have to fix the Repo Class first.
-
-        // Let's write the service assuming the Repo HAS `deductStock`.
-        // I will perform a `multi_replace` on the Repo file later to add it.
-
-        return (this.repository as any).deductStock(inventoryId, pharmacyId, quantity, tx);
+        await this.findById(inventoryId, pharmacyId);
+        return this.repository.deductStock(inventoryId, pharmacyId, quantity, tx);
     }
 
     async getExpiryAlerts(pharmacyId: string, days: number = 30) {

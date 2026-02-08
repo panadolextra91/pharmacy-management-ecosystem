@@ -77,6 +77,6 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 > [!IMPORTANT]
 > **Kế hoạch tiếp theo**:
 > 1. [x] Fix `console.log(otp)` gấp.
-> 2. Update Interface `IInventoryRepository` để bỏ cái `as any`.
+> 2. [x] Update Interface `IInventoryRepository` để bỏ cái `as any`.
 > 3. Update `Owner` Entity để bỏ cái `as any`.
 > 4. Fix logic `SalesService` (Cost Price Race Condition) - Cái này khoai, cần suy nghĩ kỹ.
