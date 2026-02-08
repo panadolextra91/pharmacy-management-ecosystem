@@ -77,14 +77,14 @@ export class AuthService {
         }
 
         // Check Owner status (SaaS logic)
-        if ((owner as any).status === 'PENDING') {
+        if (owner.status === 'PENDING') {
             throw new AppError(
                 'Your account is pending approval. Please wait for admin activation.',
                 403,
                 'ACCOUNT_PENDING'
             );
         }
-        if ((owner as any).status === 'SUSPENDED') {
+        if (owner.status === 'SUSPENDED') {
             throw new AppError(
                 'Your account has been suspended. Please contact support.',
                 403,

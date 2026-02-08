@@ -56,9 +56,10 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 *   **Giải pháp**: Khai báo method `deductStock` vào Interface `IInventoryRepository`.
     > **Status (Feb 2026)**: Đã cập nhật `IInventoryRepository` và bỏ toàn bộ `as any` trong `InventoryService`.
 
-### 🟡 [MEDIUM] Vấn đề: Entity Types Outdated (AuthService.ts)
+### 🟢 [FIXED] Vấn đề: Entity Types Outdated (AuthService.ts)
 *   **Mô tả**: `(owner as any).status`.
 *   **Hậu quả**: Do file `domain/entities.ts` chưa cập nhật field `status` mới thêm vào DB, nên phải ép kiểu `any` để code chạy. Mất tính năng gợi ý code và kiểm tra lỗi type.
+    > **Status (Feb 2026)**: Đã cập nhật `OwnerEntity` và dẹp bỏ thành công `as any` trong `AuthService`.
 *   **Giải pháp**: Update Entity definitions đồng bộ với Prisma Schema.
 
 ---
@@ -79,5 +80,5 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 > **Kế hoạch tiếp theo**:
 > 1. [x] Fix `console.log(otp)` gấp.
 > 2. [x] Update Interface `IInventoryRepository` để bỏ cái `as any`.
-> 3. Update `Owner` Entity để bỏ cái `as any`.
+> 3. [x] Update `Owner` Entity để bỏ cái `as any`.
 > 4. Fix logic `SalesService` (Cost Price Race Condition) - Cái này khoai, cần suy nghĩ kỹ.
