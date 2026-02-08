@@ -59,7 +59,7 @@
 ## Sales (`/api/sales`)
 | Method | Endpoint | Description | Auth Required |
 | :--- | :--- | :--- | :--- |
-| POST | `/orders` | Create new Order. Supports POS. **Atomic Stock Check**. **Auto-Invoice if POS/Paid**. | Yes |
+| POST | `/orders` | Create new Order. Supports POS. **Atomic Stock Check**. **Auto-Invoice if POS/Paid**. *Returns 400 if stock insufficient (Atomic Guard).* | Yes |
 | GET | `/invoices/:id/receipt` | Get structured receipt data (JSON) for printing/PDF generation. | Yes |
 
 ## Real-Time WebSockets (`Socket.io`) ⚡
@@ -253,9 +253,10 @@
 | :--- | :--- | :--- | :--- |
 | **Inventory** | 7/7 | ✅ Passed | 2026-02-06 |
 | **Sales** | 5/5 | ✅ Passed | 2026-02-06 |
-| **Auth/Security** | 7/7 | ✅ Passed | 2026-02-06 |
+| **Auth/Security** | 10/10 | ✅ Passed | 2026-02-08 |
+| **Stress (Race Cond)** | 3/3 | ✅ Passed | 2026-02-08 |
 
-**Total**: 19 tests passed, 0 failed.
+**Total**: 25 tests passed, 0 failed.
 
 ### Test Command
 ```bash

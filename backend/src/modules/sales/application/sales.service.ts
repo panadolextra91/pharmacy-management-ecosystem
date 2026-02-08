@@ -35,93 +35,81 @@ export class SalesService {
         }
 
         // 3. Process each item with security checks
-        let totalAmount = 0;
-        const validItems: {
-            inventoryId: string;
-            unitId: string;
-            quantity: number;
-            price: number;
-            costPrice: number;
-            baseQuantity: number;
-        }[] = [];
-
-        for (const item of items) {
-            // 3.1 Validate quantity >= 1
-            if (!item.quantity || item.quantity < 1) {
-                throw new AppError(
-                    `Quantity must be at least 1 for item ${item.inventoryId}`,
-                    400,
-                    'INVALID_QUANTITY'
-                );
-            }
-
-            // 3.2 Fetch inventory (verifies it exists and belongs to pharmacy)
-            const inventory = await this.inventoryService.findById(item.inventoryId, pharmacyId);
-
-            // 3.3 SECURITY: Verify unitId belongs to this inventoryId
-            const unit = await prisma.inventoryUnit.findFirst({
-                where: {
-                    id: item.unitId,
-                    inventoryId: item.inventoryId,
-                },
-            });
-
-            if (!unit) {
-                throw new AppError(
-                    `Unit ID ${item.unitId} does not belong to inventory ${item.inventoryId}`,
-                    400,
-                    'UNIT_MISMATCH'
-                );
-            }
-
-            // 3.4 Calculate base quantity using conversion factor
-            const baseQuantity = item.quantity * unit.conversionFactor;
-
-            // 3.5 Stock check (in base units)
-            if (inventory.totalStockLevel < baseQuantity) {
-                throw new AppError(
-                    `Insufficient stock for ${inventory.name}. ` +
-                    `Available: ${inventory.totalStockLevel}, Requested: ${baseQuantity} (base units)`,
-                    400,
-                    'INSUFFICIENT_STOCK'
-                );
-            }
-
-            // 3.6 SERVER-SIDE PRICING - Never trust client!
-            const unitPrice = Number(unit.price);
-            const lineTotal = unitPrice * item.quantity;
-            totalAmount += lineTotal;
-
-            // 3.7 Snapshot Pricing: Get cost from FIFO batch
-            const costPrice = await this.getOldestBatchCost(item.inventoryId);
-
-            validItems.push({
-                inventoryId: item.inventoryId,
-                unitId: unit.id,
-                quantity: item.quantity,
-                price: unitPrice,
-                costPrice,
-                baseQuantity, // For stock deduction
-            });
-        }
-
         // 4. Create Order Transaction
         const result = await this.repository.executeTransaction(async (tx) => {
             const orderNumber = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            let totalAmount = 0;
+            const validItems: any[] = [];
 
+            // 1. Process Items & Deduct Stock ATOMICALLY
+            for (const item of items) {
+                // 1.1 Verify Unit & Inventory
+                // We fetch inventory via the service (which might use the repo). 
+                // Using findById inside TX ensures we see latest state if we strictly needed to, 
+                // but here we mainly need unit conversion factors.
+                // Optimally we could fetch this before TX, but for safety against race conditions on Unit changes, we do it here.
+
+                // Note: We use the existing service method, but we might want to pass 'tx' if finding needs to be in TX.
+                // Current findById doesn't support 'tx', but that's okay for read-only metadata (name, units).
+                // The critical part is deduction.
+                await this.inventoryService.findById(item.inventoryId, pharmacyId);
+
+                const unit = await prisma.inventoryUnit.findFirst({
+                    where: { id: item.unitId, inventoryId: item.inventoryId },
+                });
+
+                if (!unit) {
+                    throw new AppError(`Unit ID ${item.unitId} does not belong to inventory ${item.inventoryId}`, 400, 'UNIT_MISMATCH');
+                }
+
+                if (!item.quantity || item.quantity < 1) {
+                    throw new AppError(`Quantity must be at least 1 for item ${item.inventoryId}`, 400, 'INVALID_QUANTITY');
+                }
+
+                // 1.2 Calculate Pricing & Base Quantity
+                const unitPrice = Number(unit.price);
+                const lineTotal = unitPrice * item.quantity;
+                totalAmount += lineTotal;
+                const baseQuantity = item.quantity * unit.conversionFactor;
+
+                // 1.3 ATOMIC DEDUCTION & COST CALCULATION
+                // This throws if insufficient stock
+                // Note: costPrice is Cost Per Base Unit (e.g., per Pill)
+                const deductionResult = await this.inventoryService.deductStockWithCost(
+                    item.inventoryId,
+                    pharmacyId,
+                    baseQuantity,
+                    tx
+                );
+
+                // FIX: Calculate Cost Per Sold Unit (e.g., per Box)
+                const costPricePerSoldUnit = deductionResult.costPrice.mul(unit.conversionFactor);
+
+                validItems.push({
+                    inventoryId: item.inventoryId,
+                    unitId: unit.id,
+                    quantity: item.quantity,
+                    price: unitPrice,
+                    costPrice: costPricePerSoldUnit,
+                    costPerBaseUnit: deductionResult.costPrice, // Audit Trail
+                    baseQuantity
+                });
+            }
+
+            // 2. Create Order with Precise Costs
             const itemsCreateInput = validItems.map(item => ({
                 inventoryId: item.inventoryId,
                 unitId: item.unitId,
                 quantity: item.quantity,
                 price: item.price,
-                costPrice: item.costPrice, // Snapshot Pricing!
+                costPrice: item.costPrice,
             }));
 
             const order = await this.repository.createOrder({
                 pharmacyId,
                 customerId,
                 orderNumber,
-                status: isPosSale ? 'DELIVERED' : 'PENDING',
+                status: isPosSale ? 'DELIVERED' : 'CONFIRMED', // Immediate deduction means confirmed/delivered
                 paymentStatus: isPosSale ? 'PAID' : 'PENDING',
                 paymentMethod,
                 subtotal: totalAmount,
@@ -130,19 +118,7 @@ export class SalesService {
                 items: itemsCreateInput,
             }, tx);
 
-            // 5. Stock Deduction (for POS sales or confirmed orders)
-            if (order.status === 'CONFIRMED' || order.status === 'DELIVERED') {
-                for (const item of validItems) {
-                    await this.inventoryService.deductStock(
-                        item.inventoryId,
-                        pharmacyId,
-                        item.baseQuantity,
-                        tx // Pass transaction to ensure atomicity
-                    );
-                }
-            }
-
-            // 5.1 Auto-Generate Invoice for POS Sales
+            // 3. Auto-Generate Invoice if POS
             if (isPosSale && order.paymentStatus === 'PAID') {
                 const invoiceNumber = `INV-${order.orderNumber.split('-')[1]}-${Math.floor(Math.random() * 1000)}`;
                 await this.repository.createInvoice({
@@ -151,7 +127,7 @@ export class SalesService {
                     orderId: order.id,
                     invoiceNumber,
                     totalAmount,
-                    type: 'OFFLINE', // POS = Offline/Direct
+                    type: 'OFFLINE',
                     items: validItems.map(vi => ({
                         inventoryId: vi.inventoryId,
                         quantity: vi.quantity,
@@ -189,22 +165,6 @@ export class SalesService {
         });
 
         return result;
-    }
-
-    /**
-     * Get oldest batch cost (FIFO) for snapshot pricing
-     */
-    private async getOldestBatchCost(inventoryId: string): Promise<number> {
-        const batch = await prisma.inventoryBatch.findFirst({
-            where: {
-                inventoryId,
-                stockQuantity: { gt: 0 },
-            },
-            orderBy: { expiryDate: 'asc' }, // FEFO: First Expired, First Out
-            select: { purchasePrice: true },
-        });
-
-        return batch?.purchasePrice ? Number(batch.purchasePrice) : 0;
     }
 
     async getReceipt(invoiceId: string, pharmacyId: string) {

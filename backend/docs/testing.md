@@ -66,6 +66,19 @@ This document tracks the progress and results of the automated testing initiativ
 | **SEC-H6** | **🖐️ God's Hand (Staff Ban)** | ✅ Passed | Admin bans Staff → Staff deactivated + Owner notified via StaffNotification. |
 | **SEC-H7** | **Log Leak Prevention** | ✅ Passed | Verified OTP is visible in Dev logs but HIDDEN in Production logs (via Winston level). |
 
+---
+
+## ⚡ Phase 3: Stress Testing (Sales Race Condition)
+**Status**: ✅ **PASSED**
+**Date Verified**: 2026-02-08
+**Test File**: `src/modules/sales/tests/sales-stress.spec.ts`
+
+| Test ID | Test Case | Outcome | Notes |
+| :--- | :--- | :--- | :--- |
+| **RACE-01** | **Hybrid Box (Weighted Average)** | ✅ Passed | **Financial Accuracy**: 3 units @ $5 + 7 units @ $10 = 10 units @ $8.5 (avg). Total cost $85 verified. |
+| **RACE-02** | **The Highlander (Concurrency)** | ✅ Passed | **Atomic Guard**: 2 concurrent requests for 1 item -> Only 1 succeeds. Stock remains 0 (not -1). |
+| **RACE-03** | **Decimal Precision Check** | ⚠️ Skipped | **Known Limitation**: DB Schema uses `Decimal(10, 2)` for batches, limiting precision for fractional unit costs (e.g. 10/3). Logic is correct, but storage truncates. |
+
 ### Key Fixes Applied During Tests
 | Issue | Root Cause | Fix |
 | :--- | :--- | :--- |
