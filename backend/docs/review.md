@@ -101,6 +101,13 @@
 **What was done**:
 - **Logic**: Automatically creates `PharmacyInvoice` for any Order with `isPosSale: true` and `status: PAID`.
 - **Validation**: Ensures financial records (Invoice) match physical transactions (Order) 1:1.
+### 18. Secure Centralized Logging 🛡️
+**Status**: ☑️ DONE (Feb 8)
+
+**What was done**:
+- **Consolidated Logs**: Replaced all `console.log` instances for sensitive data (OTP) with `logger.debug` via Winston.
+- **Environment Isolation**: Configured Winston to automatically suppress `debug` outputs in **Production** environments (both Console and File).
+- **Security Objective**: Prevent sensitive token/OTP leakage to cloud logging services or accidental developer leaks.
 
 ---
 

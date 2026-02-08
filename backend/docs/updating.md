@@ -3,6 +3,11 @@
 ## 1. Tổng Quan Tình Hình (Current Status)
 
 Backend của mình (`pharmacy-management-system`) hiện tại đã hoàn thiện bộ khung sườn chính (Core) và đã implement đầy đủ các module quan trọng nhất theo kế hoạch Architecture Monolith.
+## [2026-02-08] - Security Hardening (Atomic PR) 🔐
+### Fixed
+- **OTP Console Leak**: Replaced `console.log` with `logger.debug` in `AuthService`.
+- **Log Security**: Configured Winston to suppress sensitive debug logs in Production.
+
 ## [2026-02-07] - Evidence & Verification Ready 🛡️
 ### Added
 - **SonarQube Integration**: Dockerized SonarQube setup for Quality & Security audit.
@@ -231,10 +236,11 @@ Dựa trên kế hoạch ban đầu, đây là những phần mình "để dành
 
 Mẹ con mình đã làm rất tốt phần **Backend Core**. Hệ thống Logic nghiệp vụ (Business Logic) về Kho, Bán hàng, và Nhắc lịch đã khá hoàn chỉnh.
 
-**Current Status**: ✅ **19/19 Tests Passed** (Inventory + Sales + Auth/Security)
+**Current Status**: ✅ **22/22 Tests Passed** (Inventory + Sales + Auth/Security)
 
 **Next Step Suggestion**:
 1.  ~~Viết **Unit Test** cho phần Inventory & Sales~~. ✅ DONE
 2.  ~~Viết **Security Tests** cho Auth Token Rotation~~. ✅ DONE
 3.  Tích hợp thử với Frontend để kiểm tra flow thực tế.
 4.  Viết Integration Tests cho full API flows (Register → Login → Create Order).
+5.  **Phase 4: AI Intelligence (Scheduled)**.

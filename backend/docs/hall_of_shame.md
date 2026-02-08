@@ -29,10 +29,11 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 
 ## 2. Rủi ro Bảo mật: Security Leaks 🔓
 
-### 🔴 [CRITICAL] Vấn đề: Lộ OTP trong Console (AuthService.ts)
+### 🟢 [FIXED] Vấn đề: Lộ OTP trong Console (AuthService.ts)
 *   **Mô tả**: Hàm `sendOtp` đang dùng `console.log(otp)` để in mã ra màn hình server.
 *   **Hậu quả**: Hacker nếu đọc được log server (qua CloudWatch/Portainer) sẽ thấy hết OTP của user. Hoặc developer chụp màn hình log gửi lên group chat là lộ hết.
 *   **Giải pháp**: Chỉ log khi `NODE_ENV === 'development'`, tuyệt đối không log ở production.
+    > **Status (Feb 2026)**: Đã chuyển sang `logger.debug()` (Winston). Console Production đã được cấu hình chặn hoàn toàn level này.
 
 ### 🟠 [HIGH] Vấn đề: CORS Wildcard "Rộng Cửa" (SocketProvider.ts)
 *   **Mô tả**: Socket.io cấu hình `cors: { origin: '*' }`.
@@ -74,8 +75,8 @@ Dưới đây là danh sách các lỗi "ngớ ngẩn", rủi ro bảo mật và
 
 ---
 > [!IMPORTANT]
-> **Kế hoạch ngày mai**:
-> 1. Fix `console.log(otp)` gấp.
+> **Kế hoạch tiếp theo**:
+> 1. [x] Fix `console.log(otp)` gấp.
 > 2. Update Interface `IInventoryRepository` để bỏ cái `as any`.
 > 3. Update `Owner` Entity để bỏ cái `as any`.
 > 4. Fix logic `SalesService` (Cost Price Race Condition) - Cái này khoai, cần suy nghĩ kỹ.
